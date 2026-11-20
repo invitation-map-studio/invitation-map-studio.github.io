@@ -18,6 +18,7 @@ export type Item = { id: string; tone: Tone; footer: boolean; hidden: boolean } 
   | { kind: 'dot' | 'flower'; x: number; y: number; radius: number }
 )
 export interface Spec {
+  layout?: 'minimal'
   items: Item[]
   ink: string
 }

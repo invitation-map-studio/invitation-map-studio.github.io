@@ -46,6 +46,11 @@ python3 data/prepare_dasan74.py original.json dasan74.updated.json --fetched-at 
 
 ## 약도에 표시하는 역
 
-전국 OSM 추출본(2026-11-18 UTC)에서 이름이 있는 여객 철도역·간이역 노드 1,336개를 추출했다. 같은 추출본에 `python3 scripts/prepare-stations.py south-korea-latest.osm.pbf src/stations.json`을 적용해 재생성할 수 있다. 일반 약도는 목적지 대표점에서 직선 1 km 안의 서로 다른 역을 최대 두 곳 안내한다. 지도 안의 역은 좌표에 문자 표식을 찍고, 지도 밖의 역은 방향을 적는다. [원천 자료와 ODbL](https://download.geofabrik.de/asia/south-korea.html)
+전국 OSM 추출본(2026-11-18 UTC)에서 도시철도·전철망 또는 운행 방식이 표시된 역 노드 923개를 추출했다. 같은 추출본에 `python3 scripts/prepare-stations.py south-korea-latest.osm.pbf src/stations.json`을 적용해 재생성할 수 있다. 일반 약도는 목적지 대표점에서 직선 1 km 안의 서로 다른 역을 최대 두 곳 안내한다. 주소로 약도를 만들면 두 역이 들어오도록 표시 범위를 정한다. 기존 저장본에서 지도 밖에 있는 역은 방향을 적는다. [원천 자료와 ODbL](https://download.geofabrik.de/asia/south-korea.html)
 
 한국프레스센터는 행사장이 안내하는 시청역 4번 출구(1·2호선, 도보 3분)와 광화문역 5번 출구(5호선, 도보 8분)를 사용한다. 출구 좌표는 위 추출본에서 각 역의 정류장 구역 관계(8059934, 5672805)에 속한 번호 표기 노드로 확인했다. [행사장 교통 안내](https://www.koreapresscenter.com/) · [시청역 4번 출구](https://www.openstreetmap.org/node/3404904656) · [광화문역 5번 출구](https://www.openstreetmap.org/node/3403193751)
+
+
+## 미니멀 인쇄용 도로
+
+주소를 검색하면 동일한 OSM 추출본에서 분할한 큰길 자료를 읽어 네이버 대조와 별도로 인쇄본을 만든다. `scripts/prepare-major-roads.py`는 motorway·trunk·primary·secondary·tertiary 등급의 도로를 좌표 타일로 저장한다. 작은 범위에 큰길이 없으면 최대 반경 1.5 km로 확대한다. 도로의 OSM 노드와 층위가 일치하고 세 갈래 이상으로 연결된 곳에 교차로 표식을 찍는다. 표시는 축척에 맞게 간추린다. 출처 시각은 원본 추출 시각을 사용하고, 실시간 갱신에 성공하면 해당 조회 시각을 기록한다. [큰길 타일 색인](../public/major-roads/index.json) · [동일 원천 파일의 해시](../public/address-index/source.json)

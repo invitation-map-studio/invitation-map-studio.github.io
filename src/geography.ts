@@ -1,7 +1,7 @@
 import { mapBounds, transitItems } from './transit'
 import { indexedAddresses } from './address-index'
 import { registeredPlaces, mapScale } from './location-check'
-import { parseRoadAddress } from './road-address'
+import { parseRoadAddress, matchesRegion } from './road-address'
 import {
   baseItem,
   coordinate,
@@ -115,7 +115,8 @@ export async function addresses(
   const rows = await query(`nwr${filter};out meta center 30;`, signal)
   return rows.flatMap((e) => {
     const c = e.center ?? e
-    if (!coordinate(c.lat!, c.lon!) || !Number.isSafeInteger(e.id)) return []
+    const area = [e.tags?.['addr:city'], e.tags?.['addr:district']].filter(Boolean).join(' ')
+    if (!coordinate(c.lat!, c.lon!) || !Number.isSafeInteger(e.id) || !matchesRegion(address, area)) return []
     return [
       {
         address,
@@ -136,7 +137,7 @@ export async function addresses(
     ]
   })
 }
-export async function fetchGeography(place: Place, signal: AbortSignal): Promise<Geography> {
+export async function fetchGeography(place: Place, signal: AbortSignal, minimal = false): Promise<Geography> {
   const identifier = /^(node|way|relation)\/([1-9]\d{0,12})$/.exec(place.id)
   if (
     !identifier ||
@@ -207,7 +208,8 @@ export async function fetchGeography(place: Place, signal: AbortSignal): Promise
   }
   const around = `(around:${Math.ceil(place.radius * 1.76)},${place.lat},${place.lon})`
   const rows = await query(
-    `(way["highway"~"^(primary|secondary|tertiary|trunk|residential|unclassified|service|living_street|road|primary_link|secondary_link|tertiary_link|trunk_link)$"]${around};nwr["name"]["amenity"~"^(school|library|community_centre)$"]${around};node["name"]["highway"="bus_stop"]${around};node["name"]["railway"="station"]${around};);out meta geom;`,
+    minimal ? `way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"]${around};out meta geom;` :
+    `(way["highway"~"^(motorway|primary|secondary|tertiary|trunk|residential|unclassified|service|living_street|road|primary_link|secondary_link|tertiary_link|trunk_link)$"]${around};nwr["name"]["amenity"~"^(school|library|community_centre)$"]${around};node["name"]["highway"="bus_stop"]${around};node["name"]["railway"="station"]${around};);out meta geom;`,
     signal,
   )
   const roads: Road[] = [],
@@ -384,6 +386,8 @@ function placement(
   return { x, y, angle, bounds }
 }
 
+const majorRoads = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
+
 export function layout(geo: Geography, name: string): Spec {
   const { place } = geo,
     scale = 440 / place.radius
@@ -392,38 +396,37 @@ export function layout(geo: Geography, name: string): Spec {
     (lon - place.lon) * axes.x + axes.cx,
     axes.cy - (lat - place.lat) * axes.y,
   ]
-  const items: Item[] = [
-    label('title', '오시는 길', 700, 86, 30, { spacing: 4 }),
-    label('north', 'N', 1268, 88, 22),
-    {
-      ...baseItem('north-line', 'soft'),
-      kind: 'line',
-      points: [
-        [1268, 145],
-        [1268, 107],
-        [1263, 115],
-      ],
-      width: 2,
-    },
-  ]
-  const seen = new Set<number>(),
-    junctions = new Set<number>()
-  for (const road of geo.roads)
-    for (const node of road.nodes) {
-      if (seen.has(node)) junctions.add(node)
-      seen.add(node)
-    }
+  const items: Item[] = [label('title', '오시는 길', 700, 95, 30, { spacing: 4 })]
+  const roads = geo.roads.filter(road => majorRoads.has(road.highway))
+  // A shared node with three distinct branches is a junction. A bend, way split,
+  // or crossing on another level is not. Preserve these nodes during simplification.
+  const network = new Map<string, { id: number; point: Point; neighbors: Set<number>; mainStreets: Set<string> }>()
+  for (const road of roads) {
+    road.nodes.forEach((id, i) => {
+      const key = road.level + ':' + id
+      let node = network.get(key)
+      if (!node) {
+        node = { id, point: project(road.points[i]), neighbors: new Set(), mainStreets: new Set() }
+        network.set(key, node)
+      }
+      if (road.name && road.highway !== 'tertiary') node.mainStreets.add(road.name)
+      if (i > 0) node.neighbors.add(road.nodes[i - 1])
+      if (i + 1 < road.nodes.length) node.neighbors.add(road.nodes[i + 1])
+    })
+  }
+  const crossings = [...network.values()].filter(n => n.neighbors.size >= 3)
+  const junctions = new Set(crossings.map(n => n.id))
   const segments: Segment[] = []
   const streets = new Map<string, { id: number; parts: Segment[] }>()
-  for (const road of geo.roads) {
-    const points = simplify(road.points.map(project), road.nodes, junctions, 2 * scale)
+  for (const road of roads) {
+    const points = simplify(road.points.map(project), road.nodes, junctions, 10 * scale)
     let run: Point[] = [],
       section = 0
     function flush() {
       if (run.length > 1) {
-        const width = ['service', 'living_street'].includes(road.highway) ? 1.3 : 2.8
+        const width = ['motorway', 'trunk', 'primary'].includes(road.highway) ? 5 : 3
         items.push({
-          ...baseItem('road-' + road.id + '-' + section++),
+          ...baseItem('road-' + road.id + '-' + section++, 'soft'),
           kind: 'line',
           width,
           points: run,
@@ -461,13 +464,33 @@ export function layout(geo: Geography, name: string): Spec {
   for (const stop of transit) {
     if (stop.kind === 'dot') occupied.push([stop.x - 19, stop.y - 19, stop.x + 19, stop.y + 19])
   }
+  // Mark a divided intersection once at invitation scale.
+  const marked: Point[] = []
+  crossings.sort((a, b) => b.mainStreets.size - a.mainStreets.size ||
+    distance(a.point, [700, 605]) - distance(b.point, [700, 605]) || a.id - b.id)
+  for (const crossing of crossings) {
+    const [x, y] = crossing.point
+    const bounds: Rect = [x - 8, y - 8, x + 8, y + 8]
+    if (!inside([bounds[0], bounds[1]]) || !inside([bounds[2], bounds[3]]) ||
+        occupied.some(rect => overlap(bounds, rect)) ||
+        marked.some(p => distance(p, crossing.point) < 55)) continue
+    items.push({ ...baseItem('junction-' + crossing.id), kind: 'dot', x, y, radius: 6 })
+    occupied.push(bounds)
+    marked.push(crossing.point)
+    if (marked.length === 6) break
+  }
   items.push({ ...baseItem('destination'), kind: 'flower', x: 700, y: 605, radius: 28 })
   // Keep the marker at its measured point while choosing a clear position for its name.
   const venueSize = Math.max(24, Math.min(40, Math.floor(990 / Math.max(1, textWidth(name, 1)))))
+  const beside = textWidth(name, venueSize) / 2 + 38
   let venue: Placement | undefined
   for (const [dx, dy] of [
     [0, -53],
     [0, 91],
+    [beside, 12],
+    [-beside, 12],
+    [beside, -20],
+    [-beside, -20],
     [-34, -64],
     [34, -64],
     [0, -95],
@@ -524,7 +547,9 @@ export function layout(geo: Geography, name: string): Spec {
       b.parts[0].length - a.parts[0].length ||
       a.id - b.id,
   )
-  for (const street of ranked.slice(0, 24)) {
+  let streetLabels = 0
+  for (const street of ranked) {
+    if (streetLabels === 5) break
     let chosen: Placement | undefined
     for (const seg of street.parts.slice(0, 10)) {
       if (seg.length < Math.min(60, textWidth(street.text, 25) * 0.38)) break
@@ -553,6 +578,7 @@ export function layout(geo: Geography, name: string): Spec {
     }
     if (chosen) {
       occupied.push(chosen.bounds)
+      streetLabels++
       items.push(
         label('street-' + street.id, street.text, chosen.x, chosen.y, 25, {
           font: 'sans',
@@ -562,41 +588,6 @@ export function layout(geo: Geography, name: string): Spec {
     }
   }
 
-  // Landmark dots remain at the source coordinate, even when the label moves to its side.
-  const nearby = geo.landmarks
-    .map((l) => ({ ...l, point: project(l.point) }))
-    .filter((l) => inside(l.point))
-  nearby.sort((a, b) => distance(a.point, [700, 605]) - distance(b.point, [700, 605]))
-  const placedNames = new Set<string>()
-  for (const lm of nearby.slice(0, 50)) {
-    if (placedNames.size >= 9 || placedNames.has(lm.name)) continue
-    const [x, y] = lm.point
-    const dot: Rect = [x - 6, y - 6, x + 6, y + 6]
-    if (occupied.some((b) => overlap(b, dot))) continue
-    const half = textWidth(lm.name, 25) / 2 + 13
-    let chosen: Placement | undefined
-    for (const [dx, dy] of [
-      [0, -16],
-      [0, 40],
-      [half, 9],
-      [-half, 9],
-      [half, -17],
-      [-half, -17],
-      [half, 38],
-      [-half, 38],
-    ]) {
-      chosen = placement(lm.name, 25, x + dx, y + dy, 0, segments, [...occupied, dot])
-      if (chosen) break
-    }
-    if (chosen) {
-      occupied.push(chosen.bounds, dot)
-      placedNames.add(lm.name)
-      items.push(
-        { ...baseItem('dot-' + lm.id), kind: 'dot', x, y, radius: 4.3 },
-        label('label-' + lm.id, lm.name, chosen.x, chosen.y, 25),
-      )
-    }
-  }
   items.push(
     ...transit,
     {
@@ -613,5 +604,5 @@ export function layout(geo: Geography, name: string): Spec {
     { ...label('details', '', 700, 1320, 27), footer: true },
     { ...label('parking', '', 700, 1374, 25, { font: 'sans' }), footer: true },
   )
-  return { ink: '#393334', items }
+  return { layout: 'minimal', ink: '#393334', items }
 }

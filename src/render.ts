@@ -61,7 +61,7 @@ export function render(project: Project, mapOnly = false, interactive = false) {
     if (item.hidden || (mapOnly && item.footer)) continue
     const isTitle = item.kind === 'text' && (item.id === 'ref-0' || item.id === 'title')
     const el = draw(
-      isTitle && project.review.status === 'pending'
+      isTitle && project.spec.layout !== 'minimal' && project.review.status === 'pending'
         ? {
             ...item,
             size: 24,

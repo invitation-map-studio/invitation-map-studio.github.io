@@ -17,7 +17,7 @@ import {
   type Spec,
 } from './model'
 import { addresses, fetchGeography, layout } from './geography'
-import { parseRoadAddress, mentionsVenue } from './road-address'
+import { canonicalAddress, parseRoadAddress, mentionsVenue } from './road-address'
 import { render, serialize } from './render'
 import {
   archive,
@@ -33,7 +33,8 @@ import {
   snapshots,
 } from './store'
 import { importProject } from './validate'
-import { transitItems } from './transit'
+import { stationRadius, transitItems } from './transit'
+import { indexedRoads } from './major-roads'
 import { closeNaver, showNaver } from './naver'
 import { localLocationCheck, markerPoint } from './location-check'
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -185,9 +186,16 @@ function fields() {
   field('ink').value = current.spec.ink
   sel('element').value = i.id
 }
+let naverSubject = ''
 function paint() {
   if (!current) return
-  closeNaver(el('naver-map'))
+  const subject = JSON.stringify([current.address, markerPoint(current)])
+  if (naverSubject !== subject) {
+    const container = el('naver-map')
+    closeNaver(container)
+    container.replaceChildren()
+    naverSubject = subject
+  }
   clearFiles()
   el('paper').replaceChildren(render(current, field('maponly').checked, true))
   el('project-title').textContent = current.name
@@ -215,6 +223,11 @@ function paint() {
     .filter(Boolean)
     .join('  /  ')
   el('osm-credit').hidden = current.origin !== 'osm'
+  const minimal = current.spec.layout === 'minimal'
+  el('coverage').textContent = minimal ? [
+    current.spec.items.some(i => i.id.startsWith('road-')) ? '' : '이 범위에 표시할 큰길 자료가 없습니다.',
+    current.spec.items.some(i => i.id.startsWith('transit-guide-')) ? '' : '1 km 이내에 등록된 지하철역이 없습니다.',
+  ].filter(Boolean).join(' ') : ''
   const check = localLocationCheck(current)
   el('location-result').textContent = check ? '자동 대조 · ' + check.message : ''
   const source = el<HTMLAnchorElement>('location-source')
@@ -231,7 +244,8 @@ function paint() {
             ? i.text || '빈 안내 문구'
             : i.kind === 'flower'
               ? '꽃 목적지 표식'
-              : i.id.startsWith('transit-stop-') ? '역 표식 ' + i.id.slice(-1) : '시설 점 ' + i.id,
+              : i.id.startsWith('transit-stop-') ? '역 표식 ' + i.id.slice(-1)
+              : i.id.startsWith('junction-') ? '교차로 표식' : '시설 점 ' + i.id,
           i.id,
         ),
     ),
@@ -311,26 +325,37 @@ function revised(old: Project, geo: Geography, name: string): Project {
 async function make(place: Place, name: string, force: boolean, signal: AbortSignal, details = '') {
   const footer = current.spec.items.find((item) => item.id === 'details')
   let old =
-    current.geo &&
+    current.geo && (!searching || current.spec.layout === 'minimal') &&
     placeKey(current.geo.place) === placeKey(place) &&
     current.name === name &&
     (!searching || (footer?.kind === 'text' && footer.text === details))
       ? current
       : null
   status('지도 자료를 확인하고 있습니다.')
-  if (searching && !old) {
+  let checkedMarker = ''
+  function checkLocation() {
+    const key = JSON.stringify([current.address, markerPoint(current)])
+    if (naverKey && !signal.aborted && checkedMarker !== key) {
+      checkedMarker = key
+      void checkWithNaver()
+    }
+  }
+  if (searching) {
     const stored = await savedGeography(place)
     signal.throwIfAborted()
     if (stored && !fresh(stored, Date.now())) {
-      old = createProject(stored.geo, name, details)
-      old.lastSuccessfulFetchAt = stored.lastSuccessfulFetchAt
-      old.expiresAt = stored.expiresAt
-      await use(old, '보관본으로 최신 도로 자료를 확인하고 있습니다.')
+      if (!old) {
+        old = createProject(stored.geo, name, details)
+        old.lastSuccessfulFetchAt = stored.lastSuccessfulFetchAt
+        old.expiresAt = stored.expiresAt
+      }
+      await use(old, '인쇄용 약도를 만들었습니다. 최신 도로 자료를 확인하고 있습니다.')
+      checkLocation()
     }
   }
   let result
   try {
-    result = await resolvePlace(place, force, () => fetchGeography(place, signal), signal)
+    result = await resolvePlace(place, force, () => fetchGeography(place, signal, searching || current.spec.layout === 'minimal'), signal)
   } catch (e) {
     if (old && !signal.aborted) {
       old.refreshFailed = true
@@ -360,7 +385,7 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
           ? '갱신 완료 · 변경된 지리 자료를 새 버전으로 저장했습니다.'
           : '갱신 완료',
   )
-  if (naverKey && !signal.aborted) void checkWithNaver()
+  checkLocation()
 }
 function isDasan(address: string) {
   return [fixture.address, '남양주시 다산중앙로82번안길 74', '다산중앙로82번안길 74'].includes(
@@ -373,11 +398,12 @@ el('search').onsubmit = (e) => {
     clearSearch()
     const input = field('address').value
     if (!input.trim()) throw Error('도로명주소를 입력해 주세요. 예: 세종대로 124')
-    const { address, details } = parseRoadAddress(input)
+    const parsed = parseRoadAddress(input)
+    const address = canonicalAddress(parsed.address), details = parsed.details
     const name = normalize(field('placename').value)
     const area = el('candidates')
     if (isDasan(address)) {
-      await make(knownGeo.place, name || fixture.name, false, signal, details)
+      await makeAddress(knownGeo.place, name || fixture.name, signal, details, knownGeo, fixture.fetchedAt)
       return
     }
     status('도로명과 건물번호로 후보를 찾고 있습니다.')
@@ -385,27 +411,25 @@ el('search').onsubmit = (e) => {
       (r) => r.address === address || r.address.endsWith(' ' + address),
     )
     const named = registered.filter((r) => name === r.name || mentionsVenue(details, r.name))
-    if (named.length === 1) {
-      const venue = named[0]
-      status(venue.name + '의 지도 자료를 확인하고 있습니다.')
+    const venue = named.length === 1 ? named[0] : registered.length === 1 && registered[0].address === address ? registered[0] : undefined
+    if (venue) {
       const geo = await venue.load()
-      await seedGeography(geo, datasetAt)
-      await make(geo.place, name || venue.name, false, signal, details)
+      await makeAddress(geo.place, name || venue.name, signal, details, geo)
       return
     }
     const stored = (await snapshots())
       .map((s) => s.geo.place)
       .filter((p) => normalize(p.address) === address)
-    let list: Place[] = stored
-    if (!list.length) {
-      try {
-        list = await navigator.locks.request('wedding-map-provider', { signal }, () =>
-          addresses(address, signal, registered.length === 0),
-        )
-      } catch (error) {
-        if (!registered.length || signal.aborted) throw error
-      }
+    let list: Place[]
+    try {
+      list = await navigator.locks.request('wedding-map-provider', { signal }, () =>
+        addresses(address, signal, registered.length === 0 && !stored.length),
+      )
+    } catch (error) {
+      if ((!registered.length && !stored.length) || signal.aborted) throw error
+      list = []
     }
+    for (const place of stored) if (!list.some(p => p.id === place.id)) list.push(place)
     for (const row of registered) {
       if (list.some((p) => p.id === row.site)) continue
       const geo = await row.load()
@@ -415,6 +439,13 @@ el('search').onsubmit = (e) => {
       throw Error(
         '이 주소에 연결된 OSM 건물번호가 없습니다. 주소를 확인하거나 검증한 프로젝트 JSON을 열어 주세요.',
       )
+    const namedPlaces = list.filter(p => 'venueName' in p && typeof p.venueName === 'string' &&
+      p.venueName && (name === p.venueName || mentionsVenue(details, p.venueName)))
+    if (namedPlaces.length === 1) list = namedPlaces
+    if (list.length === 1) {
+      await selectCandidate(list[0], name, details, signal)
+      return
+    }
     if (stored.length) {
       const b = document.createElement('button')
       b.textContent = '같은 주소의 다른 후보 다시 조회'
@@ -433,11 +464,41 @@ el('search').onsubmit = (e) => {
     showCandidates(list, name, details)
   })()
 }
+async function makeAddress(place: Place, name: string, signal: AbortSignal, details: string,
+  fallback?: Geography, fetchedAt = datasetAt) {
+  status('큰길과 가까운 지하철역을 찾고 있습니다.')
+  let seed
+  try {
+    seed = await indexedRoads(place, signal)
+  } catch (error) {
+    if (signal.aborted) throw error
+  }
+  const geo = seed?.geo ?? fallback
+  if (geo) await seedGeography(geo, seed?.fetchedAt ?? fetchedAt)
+  const frame = geo?.place ?? { ...place, radius: stationRadius(place) }
+  await make(frame, name, false, signal, details)
+}
+
+function registeredCandidate(p: Place) {
+  return catalog.find(r => r.site === p.id &&
+    (r.address === p.address || r.address.endsWith(' ' + p.address)))
+}
+
+async function selectCandidate(p: Place, name: string, details: string, signal: AbortSignal) {
+  const registered = registeredCandidate(p)
+  if (registered) {
+    const geo = await registered.load()
+    await makeAddress(geo.place, name || registered.name, signal, details, geo)
+  } else {
+    const { id, address, entrance, lat, lon, radius } = p
+    const venue = 'venueName' in p && typeof p.venueName === 'string' ? p.venueName : ''
+    await makeAddress({ id, address, entrance, lat, lon, radius }, name || venue || address, signal, details)
+  }
+}
+
 function showCandidates(list: Place[], name: string, details: string) {
   for (const p of list) {
-    const registered = catalog.find(
-      (r) => r.site === p.id && (r.address === p.address || r.address.endsWith(' ' + p.address)),
-    )
+    const registered = registeredCandidate(p)
     const b = document.createElement('button')
     b.textContent = [
       registered?.name || ('display' in p ? p.display : ''),
@@ -447,23 +508,7 @@ function showCandidates(list: Place[], name: string, details: string) {
     ]
       .filter(Boolean)
       .join(' · ')
-    b.onclick = searchAction(async (signal) => {
-      status('선택한 장소의 지도 자료를 확인하고 있습니다.')
-      if (registered) {
-        const geo = await registered.load()
-        await seedGeography(geo, datasetAt)
-        await make(geo.place, name || registered.name, false, signal, details)
-        return
-      }
-      const { id, address, entrance, lat, lon, radius } = p
-      await make(
-        { id, address, entrance, lat, lon, radius },
-        name || address,
-        false,
-        signal,
-        details,
-      )
-    })
+    b.onclick = searchAction(signal => selectCandidate(p, name, details, signal))
     el('candidates').append(b)
   }
 }

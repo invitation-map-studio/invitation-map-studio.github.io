@@ -41,15 +41,16 @@ function intersectsLabel(text: Label, start: Point, end: Point) {
   return enter <= leave
 }
 
-test('다산74의 목적지·도로명·시설명과 도로선이 교차하지 않는다', () => {
+test('다산74의 주요 도로와 목적지 이름을 읽을 수 있고 일반 시설을 생략한다', () => {
   const geo: Geography = fixture.geo
   const { items } = layout(geo, fixture.name)
   const labels = items.filter(
     (i) => i.kind === 'text' && !i.footer && !['title', 'north'].includes(i.id),
   )
-  assert.ok(labels.some((i) => i.kind === 'text' && i.text === '다산중앙로82번안길'))
+  assert.ok(labels.some((i) => i.kind === 'text' && i.text === '미금로'))
   assert.ok(labels.some((i) => i.kind === 'text' && i.text === fixture.name))
-  assert.ok(labels.some((i) => i.id.startsWith('label-')))
+  assert.ok(!items.some(i => /^(label-|dot-)/.test(i.id)))
+  assert.ok(items.some(i => i.id.startsWith('junction-')))
   for (const label of labels) {
     assert.equal(label.kind, 'text')
     if (label.kind !== 'text') continue
@@ -81,4 +82,20 @@ test('한국프레스센터 출구 두 곳을 지도와 지도 전용 인쇄 영
   assert.ok(generic.some(i => i.kind === 'text' && i.text.includes('시청역') && i.text.includes('지도 밖')))
   assert.ok(generic.every(i => i.kind === 'text' && !i.text.includes('도보')))
   assert.deepEqual(transitItems({...geo.place, id:'node/1', lat:33, lon:125}), [])
+})
+
+test('세 갈래 큰길만 교차로로 표시하고 입체 교차·단순 분할·골목은 생략한다', () => {
+  const place = fixture.geo.place
+  const point = (x: number, y: number): Point => [place.lon+x/100000, place.lat+y/100000]
+  const points = [point(-145,65),point(-85,65),point(-30,65),point(-85,130)]
+  const road = (id: number, nodes: number[], level = '//', highway = 'primary') => ({
+    id, nodes, level, highway, name: '', version: 1, points: nodes.map(node => points[node-1]),
+  })
+  const roads = [road(1,[1,2]),road(2,[2,3])]
+  const draw = (branch: ReturnType<typeof road>) =>
+    layout({source:'osm',place,landmarks:[],roads:[...roads,branch]},'예식장').items
+  assert.equal(draw(road(3,[2,4])).filter(i=>i.id.startsWith('junction-')).length,1)
+  assert.equal(draw(road(3,[2,4],'1/yes/')).filter(i=>i.id.startsWith('junction-')).length,0)
+  const minor = draw(road(3,[2,4],'//','service'))
+  assert.ok(!minor.some(i=>i.id.startsWith('junction-') || i.id.startsWith('road-3-')))
 })

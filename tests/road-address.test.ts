@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseRoadAddress, mentionsVenue } from '../src/road-address'
+import { parseRoadAddress, mentionsVenue, matchesRegion } from '../src/road-address'
 
 test('도로명 검색은 지번동·시설·층수 안내를 분리하고 원래 상세 문구를 보존한다', () => {
   const base = '가람시 바람길 124'
@@ -22,4 +22,11 @@ test('도로명 검색은 지번동·시설·층수 안내를 분리하고 원�
     assert.throws(() => parseRoadAddress(bad))
   assert.ok(mentionsVenue('(가람동, 예시회관 19~20층)', '예시회관'))
   assert.equal(mentionsVenue('(예시회관점)', '예시회관'), false)
+})
+
+test('주소 후보의 지역을 확인하고 생략된 행정구역은 허용한다', () => {
+  assert.ok(matchesRegion('서울 강남구 테헤란로 610', '서울특별시 강남구'))
+  assert.ok(matchesRegion('서울 강남구 테헤란로 610', '강남구'))
+  assert.equal(matchesRegion('부산 중구 중앙대로 10', '서울특별시 중구'), false)
+  assert.equal(matchesRegion('경기도 광주시 중앙로 10', '광주광역시'), false)
 })

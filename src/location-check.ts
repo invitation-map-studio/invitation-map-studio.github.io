@@ -1,7 +1,7 @@
 import institutions from '../data/evaluation/addresses.json'
 import venues from './venues.json'
 import { normalize, type Place, type Point, type Project } from './model'
-import { parseRoadAddress } from './road-address'
+import { canonicalAddress, parseRoadAddress } from './road-address'
 
 export const registeredPlaces = [...institutions, ...venues]
 
@@ -52,9 +52,7 @@ export function localLocationCheck(project: Project) {
 export function compareNaverAddress(address: string, result: string, point: Point, marker: Point) {
   function civic(value: string) {
     try {
-      return parseRoadAddress(normalize(value)).address
-        .replace(/^서울시? /, '서울특별시 ')
-        .replace(/^경기 /, '경기도 ')
+      return canonicalAddress(parseRoadAddress(normalize(value)).address)
     } catch { return '' }
   }
   const a = civic(address), b = civic(result)

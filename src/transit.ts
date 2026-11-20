@@ -22,11 +22,26 @@ function nearbyStations(place: Place): Stop[] {
   return closest
 }
 
-export function transitItems(place: Place): Item[] {
+function stationsFor(place: Place): Stop[] {
   const venue = venues.find(v => v.site === place.id && v.address === place.address)
-  const stops: Stop[] = venue?.transit.map(s => ({
+  return venue?.transit.map(s => ({
     ...s, directions: s.line + ' · 도보 ' + s.minutes + '분',
   })) ?? nearbyStations(place)
+}
+
+// Keep station labels within the same projection as the roads and the venue.
+export function stationRadius(place: Place) {
+  let radius = place.radius
+  for (const stop of stationsFor(place)) {
+    const east = Math.abs(stop.lon - place.lon) * 111320 * Math.cos(place.lat * Math.PI / 180)
+    const north = Math.abs(stop.lat - place.lat) * 111320
+    radius = Math.max(radius, east / 1.32, north * 1.10)
+  }
+  return Math.ceil(radius)
+}
+
+export function transitItems(place: Place): Item[] {
+  const stops = stationsFor(place)
   const axes = mapScale(place)
   const items: Item[] = []
   for (const [i, stop] of stops.entries()) {
