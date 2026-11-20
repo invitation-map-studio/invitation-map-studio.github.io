@@ -96,17 +96,22 @@ export async function resolveSnapshot(
 }
 export async function seedGeography(geo: Geography, fetchedAt: string) {
   const key = placeKey(geo.place)
-  await navigator.locks.request('wedding-map-provider', async () => {
-    if (await get('geo', key)) return
-    const snap: Snapshot = {
-      geo,
-      hash: await digest(JSON.stringify(geo)),
-      lastSuccessfulFetchAt: fetchedAt,
-      lastAccessedAt: fetchedAt,
-      expiresAt: iso(Date.parse(fetchedAt) + DAY),
-      imported: false,
-    }
-    await put('geo', key, snap)
+  const snap: Snapshot = {
+    geo, hash: await digest(JSON.stringify(geo)), lastSuccessfulFetchAt: fetchedAt,
+    lastAccessedAt: fetchedAt, expiresAt: iso(Date.parse(fetchedAt) + DAY), imported: false,
+  }
+  // Seed independently of slow provider requests in other tabs. The comparison
+  // and write share one transaction so an older extract cannot replace a refresh.
+  const tx = (await db()).transaction('geo', 'readwrite')
+  const store = tx.objectStore('geo')
+  const request = store.get(key)
+  request.onsuccess = () => {
+    const prior = request.result as Snapshot | undefined
+    if (!prior || prior.lastSuccessfulFetchAt < fetchedAt) store.put(snap, key)
+  }
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onerror = tx.onabort = () => reject(tx.error ?? Error('도로 자료를 저장할 수 없습니다.'))
   })
 }
 export const savedGeography = (place: Place) => get<Snapshot>('geo', placeKey(place))

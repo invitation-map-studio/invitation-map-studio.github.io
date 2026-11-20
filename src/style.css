@@ -351,12 +351,7 @@ footer {
   }
 }
 
-#address-card, .showing-fallback :is(#print-project, #editing, #editing + section, #naver) {
+.showing-fallback :is(#print-project, #editing, #editing + section, #naver) {
   display: none;
 }
 #fallback-info { padding: 1rem 0; }
-@media print {
-  body.showing-fallback > :not(#address-card) { display: none !important; }
-  body.showing-fallback #address-card { display: block; text-align: center; margin: 2cm auto; }
-  #card-qr { width: 40mm; height: 40mm; image-rendering: pixelated; }
-}

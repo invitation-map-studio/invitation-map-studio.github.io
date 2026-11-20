@@ -39,7 +39,8 @@ export function localLocationCheck(project: Project) {
   if (street) parts.push(street + (onMap ? ' 도로 표시 확인' : ' 도로 표시 확인 필요'))
   if (marker) {
     const offset = distanceMeters(marker, [place.lon, place.lat])
-    parts.push(offset < 1 ? '꽃 표식이 OSM 대표점과 일치' : `꽃 표식이 OSM 대표점에서 ${Math.round(offset)}m 이동됨`)
+    const source = place.entrance === 'commercial-address' ? '상가 주소' : 'OSM'
+    parts.push(offset < 1 ? `꽃 표식이 ${source} 대표점과 일치` : `꽃 표식이 ${source} 대표점에서 ${Math.round(offset)}m 이동됨`)
   } else parts.push('꽃 표식 확인 필요')
   const official = venues.find(r => r.site === record?.site)
   if (official && marker) {

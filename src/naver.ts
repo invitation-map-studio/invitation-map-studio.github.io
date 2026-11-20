@@ -144,14 +144,15 @@ export async function showNaver(
   address: string,
   publicKey: string,
   markerPoint?: Point,
-): Promise<void> {
+  pickForPrint?: AbortSignal,
+): Promise<{ address: string; point: Point } | undefined> {
   const key = publicKey.trim()
   const query = address.trim()
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(key)) throw new Error('네이버 지도 공개 키 설정이 필요합니다.')
   if (!query || query.length > 200)
     throw new Error('실시간으로 확인할 주소를 200자 이내로 입력해 주세요.')
   const requestId = JSON.stringify([key, query])
-  if (view?.container === container && view.requestId === requestId) {
+  if (view?.container === container && view.requestId === requestId && !pickForPrint) {
     updateNaverMarker(container, markerPoint)
     return
   }
@@ -159,6 +160,9 @@ export async function showNaver(
   const controller = new AbortController()
   const current: NonNullable<typeof view> = { container, controller, requestId, markerPoint }
   view = current
+  const cancel = () => closeNaver(container)
+  pickForPrint?.throwIfAborted()
+  pickForPrint?.addEventListener('abort', cancel, { once: true })
   const close = document.createElement('button')
   close.type = 'button'
   close.textContent = '실시간 확인 닫기'
@@ -200,6 +204,7 @@ export async function showNaver(
         info.textContent = stop ? comparison + ' · 가까운 지하철 ' + stop.name + ' (OpenStreetMap)' : comparison
       }
       current.updateInfo()
+      return { point: coords, address: item.roadAddress || '' }
     }
     for (const item of matches) {
       const lon = Number(item?.x)
@@ -220,20 +225,30 @@ export async function showNaver(
     }
     area.hidden = true
     container.append(choices, area)
-    if (matches.length === 1) display(matches[0])
-    else {
-      info.textContent = '확인할 주소 후보를 선택해 주세요.'
-      for (const item of matches) {
-        const button = document.createElement('button')
-        button.type = 'button'
-        button.textContent = item.roadAddress || item.jibunAddress || ''
-        button.onclick = () => display(item)
-        choices.append(button)
+    if (matches.length === 1) return display(matches[0])
+    let selected: ((result: ReturnType<typeof display>) => void) | undefined
+    const selection = pickForPrint && new Promise<ReturnType<typeof display>>(resolve => {
+      selected = resolve
+      controller.signal.addEventListener('abort', () => resolve(undefined), { once: true })
+    })
+    info.textContent = '확인할 주소 후보를 선택해 주세요.'
+    for (const item of matches) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.textContent = item.roadAddress || item.jibunAddress || ''
+      button.onclick = () => {
+        const result = display(item)
+        if (pickForPrint) choices.replaceChildren()
+        selected?.(result)
       }
+      choices.append(button)
     }
+    return await selection
   } catch (error) {
     if (controller.signal.aborted) return
     closeNaver(container)
     throw error
+  } finally {
+    pickForPrint?.removeEventListener('abort', cancel)
   }
 }
