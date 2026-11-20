@@ -37,14 +37,17 @@ with zipfile.ZipFile(source) as archive:
                 else:
                     shards[shard].setdefault(key, name)
 count = 0
+municipalities = set()
 for shard, entries in shards.items():
     streets = defaultdict(list)
     for (address, lat, lon), name in sorted(entries.items()):
         region, street, number = address.rsplit(' ', 2)
+        municipalities.update(x for x in region.split()[1:] if x.endswith(('시', '군', '구')))
         streets[street].append([number, region, lat, lon, name])
     (output / (shard + '.bin')).write_bytes(gzip.compress(json.dumps(streets, ensure_ascii=False,
         separators=(',', ':')).encode(), compresslevel=6, mtime=0))
     count += len(entries)
+(Path(__file__).resolve().parents[1] / 'src' / 'municipalities.json').write_text(json.dumps(sorted(municipalities), ensure_ascii=False, separators=(',', ':')) + '\n')
 (output / 'source.json').write_text(json.dumps(dict(source='소상공인시장진흥공단 상가(상권)정보',
     url='https://www.data.go.kr/data/15083033/fileData.do', release=Path(filename).stem.split('_')[-1],
     locations=count), ensure_ascii=False) + '\n')
