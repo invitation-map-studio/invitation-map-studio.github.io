@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://oapi.map.naver.com https://openapi.map.naver.com; connect-src 'self' https://overpass-api.de https://maps.apigw.ntruss.com https://*.map.naver.com https://*.pstatic.net; img-src 'self' data: blob: https://*.map.naver.com https://*.pstatic.net; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="theme-color" content="#fbf9f5">
+<title>오시는 길 · 청첩장 약도 작업실</title></head>
+<body>
+<header><div class="brand"><span class="flower" aria-hidden="true">✿</span> 오시는 길</div><div class="headnote">청첩장 약도 작업실</div></header>
+<main id="gate"><section class="intro"><div class="intro-type">청첩장 약도 작업실</div><h1>오시는 길</h1><p>도로와 장소를 담은 약도를 만들고,<br>청첩장에 맞게 다듬어 인쇄하세요.</p>
+<form id="unlock"><label for="password" id="password-label">이용 암호</label><input id="password" type="password" maxlength="128" required autocomplete="current-password"><button class="primary" id="enter">작업실 열기</button></form>
+<p class="fine" id="gate-hint">지인 이용 확인용 비밀번호이며 API 접근을 완전히 차단하지 않습니다.</p><p role="alert" id="gate-error"></p></section>
+<figure class="cover"><img src="./src/cover.svg" alt="다산순환로 20 약도에 표시된 파로스컨벤션과 주변 도로"><figcaption>다산순환로 20 <span>파로스컨벤션</span></figcaption></figure></main>
+<main id="studio" hidden>
+<div class="top"><div><p class="overline">청첩장 약도 작업실</p><h1>약도 편집</h1></div><button id="relock">작업실 잠그기</button></div>
+<div class="grid"><aside>
+<section><h2>장소 찾기</h2><form id="search"><label for="address">도로명주소</label><input id="address" maxlength="160" placeholder="다산중앙로82번안길 74" required><label for="placename">청첩장에 쓸 장소명</label><input id="placename" maxlength="54" placeholder="장소명 또는 건물명"><button class="primary">주소로 약도 만들기</button></form>
+<p class="fine">조회하면 도로명주소 또는 좌표가 OpenStreetMap의 Overpass로 전송됩니다. 프로젝트는 이 브라우저에 저장합니다.</p><div id="candidates"></div><button id="naver" hidden>네이버 지도에서 위치 확인</button><div id="naver-map"></div></section>
+<section><h2>내 프로젝트</h2><label for="saved">이 기기의 저장본</label><select id="saved"></select><div class="row"><button id="open">열기</button><button id="import-btn">JSON 가져오기</button><input type="file" id="import" accept=".json,application/json" hidden></div>
+<details><summary>기준 약도 보기</summary><button id="dasan74">다산74 · 단지 중심 약도</button><button id="dasan20">다산20 · 디자인 기준 약도</button></details></section>
+<section id="editing"><h2>문구와 위치</h2><p class="fine">미리보기에서 글자나 표식을 선택해 이동할 수 있습니다.</p>
+<label for="element">편집할 요소</label><select id="element"></select><label for="caption">표시 문구</label><input id="caption" maxlength="160"><div class="coords"><label>X 좌표<input type="number" id="x" min="0" max="1400" step="0.1"></label><label>Y 좌표<input type="number" id="y" min="0" max="1440" step="0.1"></label></div>
+<div class="row"><label class="check"><input type="checkbox" id="visible"> 표시</label><label class="check">먹색 <input type="color" id="ink"></label></div><div class="row"><button id="apply">편집 적용</button><button id="undo">실행 취소</button></div></section>
+<section><h2>저장과 검수</h2><div class="row"><button id="backup">JSON 백업</button><button id="refresh">지금 다시 확인</button></div><details><summary>위치 대조 기록</summary><label for="review-note">대조 방법과 관찰 내용</label><textarea id="review-note" maxlength="500" rows="3"></textarea><label for="review-source">직접 대조한 네이버 지도 URL</label><input id="review-source" type="url" placeholder="https://map.naver.com/…"><div id="review-checks"></div><button id="review">대조 기록 저장</button></details><details><summary>저장 데이터 관리</summary><p class="fine">삭제하면 이 브라우저의 모든 프로젝트와 보관 파일을 지웁니다.</p><button id="erase">기기 데이터 삭제</button></details></section>
+</aside>
+<article><div class="previewbar"><div><h2 id="project-title">약도 미리보기</h2><p id="project-address"></p></div><label class="check"><input type="checkbox" id="maponly"> 지도만</label></div>
+<div class="paper" id="paper"></div>
+<div class="details" id="meta"></div><p class="status" id="status" role="status" aria-live="polite"></p><div class="row"><button id="download" class="primary">인쇄 파일 만들기</button><button id="print-preview">150 dpi 미리보기</button><button id="cancel" hidden>취소</button></div><div id="downloads"></div>
+<details><summary>보관된 완성 파일</summary><div id="archives"></div></details></article></div>
+</main>
+<footer>오시는 길 <span>청첩장 약도 작업실</span></footer>
+<script type="module" src="./src/main.ts"></script></body></html>

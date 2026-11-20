@@ -1,0 +1,572 @@
+{
+  "source": "Geofabrik South Korea / OpenStreetMap",
+  "license": "ODbL-1.0",
+  "attribution": "© OpenStreetMap contributors · https://www.openstreetmap.org/copyright",
+  "osmBase": "2026-11-18T21:21:02Z",
+  "radius": 350,
+  "records": [
+    {
+      "name": "다산신도시 자연앤푸르지오",
+      "type": "단지",
+      "address": "경기도 남양주시 다산중앙로82번안길 74",
+      "url": "https://apply.gh.or.kr/co/cop/selectAstMngListPopup.do",
+      "site": "way/825237097",
+      "version": 5,
+      "sourceName": "다산신도시 자연앤푸르지오",
+      "exactAddressCandidates": [],
+      "selectedByAddress": false,
+      "center": [
+        127.164519,
+        37.6149529
+      ],
+      "roads": 80,
+      "landmarks": 4,
+      "sharedNodes": 92,
+      "namedRoads": [
+        "다산중앙로82번길",
+        "다산중앙로82번안길",
+        "미금로",
+        "미금로128번길",
+        "미금로159번길",
+        "미금로181번길",
+        "미금로189번길",
+        "북부간선로"
+      ],
+      "levelTaggedWays": 3,
+      "layout": {
+        "milliseconds": 2.63,
+        "roadRuns": 81,
+        "labels": 6,
+        "streetLabels": 5,
+        "addressRoadLabeled": true,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 471,
+        "zipEntries": 10,
+        "zipBytes": 2497980,
+        "zipSha256": "9d61d28ed53568b2c18ad3aa4e9d0497e57702cf11072a1e0740bff9ecc461b6"
+      }
+    },
+    {
+      "name": "금교초등학교",
+      "type": "단지 주변",
+      "address": "경기도 남양주시 미금로 194",
+      "url": "https://kumkyo-e.goegn.kr/kumkyo-e/lm/location/locationMapView.do?mi=10613",
+      "site": "way/563019871",
+      "version": 5,
+      "sourceName": "금교초등학교",
+      "exactAddressCandidates": [],
+      "selectedByAddress": false,
+      "center": [
+        127.161546,
+        37.6140627
+      ],
+      "roads": 89,
+      "landmarks": 4,
+      "sharedNodes": 99,
+      "namedRoads": [
+        "다산순환로",
+        "다산중앙로20번길",
+        "다산중앙로82번안길",
+        "미금로",
+        "미금로128번길",
+        "미금로159번길",
+        "미금로181번길",
+        "미금로189번길",
+        "북부간선로"
+      ],
+      "levelTaggedWays": 2,
+      "layout": {
+        "milliseconds": 1.52,
+        "roadRuns": 90,
+        "labels": 6,
+        "streetLabels": 6,
+        "addressRoadLabeled": true,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 310,
+        "zipEntries": 10,
+        "zipBytes": 2533096,
+        "zipSha256": "322df583f2efb38ddf420b687604d89dd2593ee154321add4e9903ab706b8407"
+      }
+    },
+    {
+      "name": "서울특별시청",
+      "type": "도심 교차로",
+      "address": "서울특별시 중구 세종대로 110",
+      "url": "https://www.seoul.go.kr/seoul/seoul.do",
+      "site": "way/198561926",
+      "version": 28,
+      "sourceName": "서울특별시청",
+      "exactAddressCandidates": [
+        {
+          "id": "node/13823586201",
+          "name": ""
+        },
+        {
+          "id": "node/13851761388",
+          "name": "내셔날프레스클럽"
+        },
+        {
+          "id": "way/198561926",
+          "name": "서울특별시청"
+        },
+        {
+          "id": "relation/10757525",
+          "name": "서울도서관"
+        }
+      ],
+      "selectedByAddress": true,
+      "center": [
+        126.97842215,
+        37.5666904
+      ],
+      "roads": 96,
+      "landmarks": 501,
+      "sharedNodes": 96,
+      "namedRoads": [
+        "남대문로1길",
+        "남대문로5길",
+        "남대문로7길",
+        "남대문로9길",
+        "다동길",
+        "덕수궁길",
+        "무교로",
+        "서소문로",
+        "세종대로",
+        "세종대로18길",
+        "세종대로19길",
+        "세종대로20길",
+        "세종대로21길",
+        "세종대로22길",
+        "소공로",
+        "을지로",
+        "을지로1길",
+        "을지로3길",
+        "종로",
+        "청계천로"
+      ],
+      "levelTaggedWays": 1,
+      "layout": {
+        "milliseconds": 3.29,
+        "roadRuns": 97,
+        "labels": 12,
+        "streetLabels": 11,
+        "addressRoadLabeled": true,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 366,
+        "zipEntries": 10,
+        "zipBytes": 2120416,
+        "zipSha256": "819434e7c7c8d01d0bc19bb98ec49af5d139916f87c530cbe4ebf9c763ea5f74"
+      }
+    },
+    {
+      "name": "서울시립미술관 서소문본관",
+      "type": "도심 교차로",
+      "address": "서울특별시 중구 덕수궁길 61",
+      "url": "https://sema.seoul.go.kr/kr/visit/seosomun",
+      "site": "way/626112515",
+      "version": 9,
+      "sourceName": "서울시립미술관",
+      "exactAddressCandidates": [
+        {
+          "id": "way/626112515",
+          "name": "서울시립미술관"
+        }
+      ],
+      "selectedByAddress": true,
+      "center": [
+        126.9738109,
+        37.56410855
+      ],
+      "roads": 66,
+      "landmarks": 384,
+      "sharedNodes": 69,
+      "namedRoads": [
+        "남대문로1길",
+        "덕수궁길",
+        "서소문로",
+        "서소문로11길",
+        "서소문로12길",
+        "세종대로",
+        "세종대로11길",
+        "세종대로12길",
+        "세종대로14길",
+        "세종대로16길",
+        "세종대로18길",
+        "세종대로19길",
+        "세종대로7길",
+        "세종대로9길",
+        "소공로",
+        "정동길",
+        "통일로2길"
+      ],
+      "levelTaggedWays": 2,
+      "layout": {
+        "milliseconds": 1.99,
+        "roadRuns": 66,
+        "labels": 13,
+        "streetLabels": 11,
+        "addressRoadLabeled": true,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 359,
+        "zipEntries": 10,
+        "zipBytes": 2267607,
+        "zipSha256": "e7286e4ab6ec84bdcf44036c149694fbffdf00f6d112518744f2579d7fb2f74a"
+      }
+    },
+    {
+      "name": "세종문화회관",
+      "type": "도심 교차로",
+      "address": "서울특별시 종로구 세종대로 175",
+      "url": "https://www.sejongpac.or.kr/portal/main/contents.do?menuNo=200352",
+      "site": "way/543729863",
+      "version": 14,
+      "sourceName": "세종문화회관",
+      "exactAddressCandidates": [
+        {
+          "id": "node/12074724066",
+          "name": "오리지널팬케이크하우스"
+        },
+        {
+          "id": "node/13805210442",
+          "name": "세종체임버홀"
+        },
+        {
+          "id": "way/223158436",
+          "name": "세종문화회관 대극장"
+        },
+        {
+          "id": "way/223158439",
+          "name": "세종문화회관 체임버홀"
+        },
+        {
+          "id": "way/543729862",
+          "name": "세종문화회관 미술관"
+        },
+        {
+          "id": "way/543729863",
+          "name": "세종문화회관"
+        }
+      ],
+      "selectedByAddress": true,
+      "center": [
+        126.97560305,
+        37.572319
+      ],
+      "roads": 114,
+      "landmarks": 114,
+      "sharedNodes": 111,
+      "namedRoads": [
+        "경희궁2길",
+        "경희궁길",
+        "광화문지하도로",
+        "덕수궁길",
+        "사직로",
+        "사직로8길",
+        "삼봉로",
+        "새문안로",
+        "새문안로2길",
+        "새문안로3길",
+        "새문안로5가길",
+        "새문안로5길",
+        "새문안로9길",
+        "세종대로",
+        "세종대로21길",
+        "세종대로23길",
+        "종로",
+        "종로1길",
+        "종로3길",
+        "종로5길",
+        "청계천로"
+      ],
+      "levelTaggedWays": 7,
+      "layout": {
+        "milliseconds": 2.18,
+        "roadRuns": 114,
+        "labels": 15,
+        "streetLabels": 14,
+        "addressRoadLabeled": true,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 356,
+        "zipEntries": 10,
+        "zipBytes": 2271996,
+        "zipSha256": "aae8843b83b9ca5342367315e2b953ee0f49e3e027b415b4d6ad784cfb74c604"
+      }
+    },
+    {
+      "name": "서울역사박물관",
+      "type": "도심 교차로",
+      "address": "서울특별시 종로구 새문안로 55",
+      "url": "https://museum.seoul.go.kr/chd/watch/watchGuideMap.jsp",
+      "site": "relation/8448914",
+      "version": 27,
+      "sourceName": "서울역사박물관",
+      "exactAddressCandidates": [
+        {
+          "id": "way/196071778",
+          "name": "흥화문"
+        },
+        {
+          "id": "relation/8448914",
+          "name": "서울역사박물관"
+        }
+      ],
+      "selectedByAddress": true,
+      "center": [
+        126.97027825,
+        37.5704691
+      ],
+      "roads": 46,
+      "landmarks": 62,
+      "sharedNodes": 49,
+      "namedRoads": [
+        "경교장길",
+        "경희궁1가길",
+        "경희궁1길",
+        "경희궁2길",
+        "경희궁4길",
+        "경희궁길",
+        "새문안로",
+        "새문안로2길",
+        "새문안로3길",
+        "새문안로5길",
+        "세종대로23길",
+        "송월길",
+        "정동길"
+      ],
+      "levelTaggedWays": 4,
+      "layout": {
+        "milliseconds": 1.24,
+        "roadRuns": 47,
+        "labels": 12,
+        "streetLabels": 9,
+        "addressRoadLabeled": true,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 408,
+        "zipEntries": 10,
+        "zipBytes": 2119842,
+        "zipSha256": "f7b5ba7fc8927991216f72a9bf19495780eafb6adb86b03f1654bcc5d1fd78cf"
+      }
+    },
+    {
+      "name": "국립중앙박물관",
+      "type": "대형 단지",
+      "address": "서울특별시 용산구 서빙고로 137",
+      "url": "https://www.museum.go.kr/MUSEUM/contents/M0106030000.do?menuId=car-map",
+      "site": "way/168364800",
+      "version": 36,
+      "sourceName": "국립중앙박물관",
+      "exactAddressCandidates": [
+        {
+          "id": "node/1808686401",
+          "name": "투썸플레이스 국립중앙박물관1점"
+        },
+        {
+          "id": "node/2669761339",
+          "name": "국립중앙박물관 어린이박물관"
+        },
+        {
+          "id": "node/3128848729",
+          "name": "CU 중앙박물관점"
+        },
+        {
+          "id": "node/3852783585",
+          "name": "거울못식당"
+        },
+        {
+          "id": "node/5589979611",
+          "name": "구르메플레이스"
+        },
+        {
+          "id": "node/5708865020",
+          "name": "국립중앙박물관 극장용"
+        },
+        {
+          "id": "node/13805210181",
+          "name": "극장 용"
+        },
+        {
+          "id": "way/168364800",
+          "name": "국립중앙박물관"
+        }
+      ],
+      "selectedByAddress": true,
+      "center": [
+        126.98037325,
+        37.5239253
+      ],
+      "roads": 33,
+      "landmarks": 10,
+      "sharedNodes": 35,
+      "namedRoads": [
+        "X Corps Boulevard"
+      ],
+      "levelTaggedWays": 0,
+      "layout": {
+        "milliseconds": 0.29,
+        "roadRuns": 33,
+        "labels": 6,
+        "streetLabels": 1,
+        "addressRoadLabeled": false,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 416,
+        "zipEntries": 10,
+        "zipBytes": 1771858,
+        "zipSha256": "dc23078c94f96b2f8e20bcf91cb2042ba86798472183a7d9ea7fd274887a112e"
+      }
+    },
+    {
+      "name": "경복궁",
+      "type": "대형 단지",
+      "address": "서울특별시 종로구 사직로 161",
+      "url": "https://royal.khs.go.kr/ENG/contents/R707000000.do",
+      "site": "relation/5501517",
+      "version": 35,
+      "sourceName": "경복궁",
+      "exactAddressCandidates": [
+        {
+          "id": "way/170199428",
+          "name": "근정전"
+        },
+        {
+          "id": "way/170199440",
+          "name": "광화문"
+        }
+      ],
+      "selectedByAddress": false,
+      "center": [
+        126.97690205,
+        37.57976625
+      ],
+      "roads": 26,
+      "landmarks": 9,
+      "sharedNodes": 23,
+      "namedRoads": [
+        "북촌로5길",
+        "삼청로",
+        "자하문로10길",
+        "자하문로6길",
+        "청와대로",
+        "효자로",
+        "효자로7길",
+        "효자로9길"
+      ],
+      "levelTaggedWays": 0,
+      "layout": {
+        "milliseconds": 0.35,
+        "roadRuns": 26,
+        "labels": 9,
+        "streetLabels": 7,
+        "addressRoadLabeled": false,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 348,
+        "zipEntries": 10,
+        "zipBytes": 1692739,
+        "zipSha256": "427c12115445329c185e788a81370300637d4d424ea4624d988c25bad343dffd"
+      }
+    },
+    {
+      "name": "국립수목원",
+      "type": "외곽 진입로",
+      "address": "경기도 포천시 소흘읍 광릉수목원로 509",
+      "url": "https://kna.forest.go.kr/kfsweb/kfi/kfs/mbm/selectEmployeeList.do?category1=1400837&mn=UKNA_06_03_02",
+      "site": "way/489293262",
+      "version": 11,
+      "sourceName": "국립수목원",
+      "exactAddressCandidates": [],
+      "selectedByAddress": false,
+      "center": [
+        127.16335785,
+        37.7532947
+      ],
+      "roads": 10,
+      "landmarks": 0,
+      "sharedNodes": 13,
+      "namedRoads": [],
+      "levelTaggedWays": 0,
+      "layout": {
+        "milliseconds": 0.2,
+        "roadRuns": 11,
+        "labels": 0,
+        "streetLabels": 0,
+        "addressRoadLabeled": false,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 265,
+        "zipEntries": 10,
+        "zipBytes": 1494289,
+        "zipSha256": "5f27b1f6a5714897f79ec218778f9d56cfc515119443c5d3fa0626ba635b73dd"
+      }
+    },
+    {
+      "name": "국립현대미술관 과천",
+      "type": "외곽 진입로",
+      "address": "경기도 과천시 광명로 313",
+      "url": "https://www.mmca.go.kr/visitingInfo/gwacheonInfo.do",
+      "site": "way/40791172",
+      "version": 15,
+      "sourceName": "국립현대미술관 과천관",
+      "exactAddressCandidates": [
+        {
+          "id": "way/40791172",
+          "name": "국립현대미술관 과천관"
+        }
+      ],
+      "selectedByAddress": true,
+      "center": [
+        127.01990465,
+        37.4309785
+      ],
+      "roads": 10,
+      "landmarks": 2,
+      "sharedNodes": 7,
+      "namedRoads": [
+        "광명로",
+        "동물원둘레길",
+        "서울대공원 코끼리열차"
+      ],
+      "levelTaggedWays": 1,
+      "layout": {
+        "milliseconds": 0.28,
+        "roadRuns": 10,
+        "labels": 5,
+        "streetLabels": 3,
+        "addressRoadLabeled": true,
+        "venueInFooter": false,
+        "potentialLabelRoadConflicts": 0
+      },
+      "export": {
+        "milliseconds": 350,
+        "zipEntries": 10,
+        "zipBytes": 1615690,
+        "zipSha256": "a6d2f456ceb868a5b6f02093b269363bf190a75fdb1f27da6d0097187589e285"
+      }
+    }
+  ],
+  "browser": "157.0.8103.79"
+}

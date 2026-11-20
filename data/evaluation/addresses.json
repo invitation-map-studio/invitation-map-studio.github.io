@@ -1,0 +1,72 @@
+[
+  {
+    "name": "다산신도시 자연앤푸르지오",
+    "type": "단지",
+    "address": "경기도 남양주시 다산중앙로82번안길 74",
+    "url": "https://apply.gh.or.kr/co/cop/selectAstMngListPopup.do",
+    "site": "way/825237097"
+  },
+  {
+    "name": "금교초등학교",
+    "type": "단지 주변",
+    "address": "경기도 남양주시 미금로 194",
+    "url": "https://kumkyo-e.goegn.kr/kumkyo-e/lm/location/locationMapView.do?mi=10613",
+    "site": "way/563019871"
+  },
+  {
+    "name": "서울특별시청",
+    "type": "도심 교차로",
+    "address": "서울특별시 중구 세종대로 110",
+    "url": "https://www.seoul.go.kr/seoul/seoul.do",
+    "site": "way/198561926"
+  },
+  {
+    "name": "서울시립미술관 서소문본관",
+    "type": "도심 교차로",
+    "address": "서울특별시 중구 덕수궁길 61",
+    "url": "https://sema.seoul.go.kr/kr/visit/seosomun",
+    "site": "way/626112515"
+  },
+  {
+    "name": "세종문화회관",
+    "type": "도심 교차로",
+    "address": "서울특별시 종로구 세종대로 175",
+    "url": "https://www.sejongpac.or.kr/portal/main/contents.do?menuNo=200352",
+    "site": "way/543729863"
+  },
+  {
+    "name": "서울역사박물관",
+    "type": "도심 교차로",
+    "address": "서울특별시 종로구 새문안로 55",
+    "url": "https://museum.seoul.go.kr/chd/watch/watchGuideMap.jsp",
+    "site": "relation/8448914"
+  },
+  {
+    "name": "국립중앙박물관",
+    "type": "대형 단지",
+    "address": "서울특별시 용산구 서빙고로 137",
+    "url": "https://www.museum.go.kr/MUSEUM/contents/M0106030000.do?menuId=car-map",
+    "site": "way/168364800"
+  },
+  {
+    "name": "경복궁",
+    "type": "대형 단지",
+    "address": "서울특별시 종로구 사직로 161",
+    "url": "https://royal.khs.go.kr/ENG/contents/R707000000.do",
+    "site": "relation/5501517"
+  },
+  {
+    "name": "국립수목원",
+    "type": "외곽 진입로",
+    "address": "경기도 포천시 소흘읍 광릉수목원로 509",
+    "url": "https://kna.forest.go.kr/kfsweb/kfi/kfs/mbm/selectEmployeeList.do?category1=1400837&mn=UKNA_06_03_02",
+    "site": "way/489293262"
+  },
+  {
+    "name": "국립현대미술관 과천",
+    "type": "외곽 진입로",
+    "address": "경기도 과천시 광명로 313",
+    "url": "https://www.mmca.go.kr/visitingInfo/gwacheonInfo.do",
+    "site": "way/40791172"
+  }
+]

@@ -1,0 +1,939 @@
+{
+  "ink": "#393334",
+  "items": [
+    {
+      "kind": "text",
+      "text": "오시는 길",
+      "x": 700.0,
+      "y": 86.0,
+      "font": "serif",
+      "size": 30.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 4.0,
+      "angle": 0,
+      "id": "ref-0",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "N",
+      "x": 1268.0,
+      "y": 88.0,
+      "font": "serif",
+      "size": 22.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-1",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          1268.0,
+          145.0
+        ],
+        [
+          1268.0,
+          107.0
+        ]
+      ],
+      "width": 1.6,
+      "id": "ref-2",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          1264.64,
+          114.0
+        ],
+        [
+          1268.0,
+          107.0
+        ],
+        [
+          1271.36,
+          114.0
+        ]
+      ],
+      "width": 2.4,
+      "id": "ref-3",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          91.0,
+          174.0
+        ],
+        [
+          141.0,
+          320.0
+        ],
+        [
+          178.0,
+          502.0
+        ],
+        [
+          190.0,
+          676.0
+        ],
+        [
+          190.0,
+          846.0
+        ],
+        [
+          215.0,
+          1070.0
+        ]
+      ],
+      "width": 1.25,
+      "id": "ref-4",
+      "tone": "line",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          126.0,
+          170.0
+        ],
+        [
+          175.0,
+          315.0
+        ],
+        [
+          212.0,
+          498.0
+        ],
+        [
+          224.0,
+          673.0
+        ],
+        [
+          224.0,
+          844.0
+        ],
+        [
+          249.0,
+          1066.0
+        ]
+      ],
+      "width": 1.25,
+      "id": "ref-5",
+      "tone": "line",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "왕",
+      "x": 165.0,
+      "y": 770.0,
+      "font": "serif",
+      "size": 29.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-6",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "숙",
+      "x": 165.0,
+      "y": 809.0,
+      "font": "serif",
+      "size": 29.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-7",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "천",
+      "x": 165.0,
+      "y": 848.0,
+      "font": "serif",
+      "size": 29.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-8",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          359.0,
+          132.0
+        ],
+        [
+          415.0,
+          228.0
+        ],
+        [
+          530.0,
+          430.0
+        ],
+        [
+          530.0,
+          583.0
+        ],
+        [
+          550.0,
+          734.0
+        ],
+        [
+          611.0,
+          941.0
+        ]
+      ],
+      "width": 3.1,
+      "id": "ref-9",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          359.84,
+          143.06
+        ],
+        [
+          359.0,
+          132.0
+        ],
+        [
+          368.16,
+          138.26
+        ]
+      ],
+      "width": 2.4,
+      "id": "ref-10",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          90.0,
+          682.0
+        ],
+        [
+          530.0,
+          583.0
+        ],
+        [
+          960.0,
+          385.0
+        ]
+      ],
+      "width": 2.6,
+      "id": "ref-11",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          99.74,
+          684.18
+        ],
+        [
+          90.0,
+          682.0
+        ],
+        [
+          97.8,
+          675.77
+        ]
+      ],
+      "width": 2.4,
+      "id": "ref-12",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          900.0,
+          138.0
+        ],
+        [
+          900.0,
+          245.0
+        ],
+        [
+          914.0,
+          320.0
+        ],
+        [
+          960.0,
+          385.0
+        ],
+        [
+          1097.0,
+          592.0
+        ]
+      ],
+      "width": 2.6,
+      "id": "ref-13",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          895.68,
+          147.0
+        ],
+        [
+          900.0,
+          138.0
+        ],
+        [
+          904.32,
+          147.0
+        ]
+      ],
+      "width": 2.4,
+      "id": "ref-14",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          611.0,
+          941.0
+        ],
+        [
+          1097.0,
+          592.0
+        ],
+        [
+          1240.0,
+          428.0
+        ],
+        [
+          1268.0,
+          230.0
+        ]
+      ],
+      "width": 3.1,
+      "id": "ref-15",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          1261.85,
+          239.23
+        ],
+        [
+          1268.0,
+          230.0
+        ],
+        [
+          1271.36,
+          240.57
+        ]
+      ],
+      "width": 2.4,
+      "id": "ref-16",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          289.0,
+          637.25
+        ],
+        [
+          289.0,
+          788.0
+        ],
+        [
+          302.0,
+          925.0
+        ],
+        [
+          399.0,
+          1015.0
+        ],
+        [
+          611.0,
+          941.0
+        ]
+      ],
+      "width": 1.9,
+      "id": "ref-17",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          611.0,
+          941.0
+        ],
+        [
+          602.0,
+          1064.0
+        ],
+        [
+          605.0,
+          1110.0
+        ]
+      ],
+      "width": 1.9,
+      "id": "ref-18",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          608.42,
+          1101.81
+        ],
+        [
+          605.0,
+          1110.0
+        ],
+        [
+          600.75,
+          1102.21
+        ]
+      ],
+      "width": 2.4,
+      "id": "ref-19",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          1097.0,
+          592.0
+        ],
+        [
+          1140.0,
+          711.0
+        ],
+        [
+          1054.0,
+          880.0
+        ],
+        [
+          1106.0,
+          1060.0
+        ],
+        [
+          1143.0,
+          1124.0
+        ]
+      ],
+      "width": 2.25,
+      "id": "ref-20",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          1142.24,
+          1114.05
+        ],
+        [
+          1143.0,
+          1124.0
+        ],
+        [
+          1134.76,
+          1118.37
+        ]
+      ],
+      "width": 2.4,
+      "id": "ref-21",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "다산순환로",
+      "x": 436.0,
+      "y": 437.0,
+      "font": "sans",
+      "size": 27.0,
+      "weight": 400,
+      "anchor": "start",
+      "spacing": 1.0,
+      "angle": 60.0,
+      "id": "ref-22",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "다산중앙로19번길",
+      "x": 751.0,
+      "y": 451.0,
+      "font": "sans",
+      "size": 27.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.35,
+      "angle": -24.7,
+      "id": "ref-23",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "다산중앙로",
+      "x": 1040.0,
+      "y": 460.0,
+      "font": "sans",
+      "size": 27.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 1.0,
+      "angle": 56.5,
+      "id": "ref-24",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "미금로",
+      "x": 935.0,
+      "y": 760.0,
+      "font": "sans",
+      "size": 29.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 2.0,
+      "angle": -35.7,
+      "id": "ref-25",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "도농로",
+      "x": 1120.0,
+      "y": 935.0,
+      "font": "sans",
+      "size": 27.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 1.0,
+      "angle": 74.0,
+      "id": "ref-26",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "dot",
+      "x": 285.0,
+      "y": 225.0,
+      "radius": 4.3,
+      "id": "ref-27",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "다산체육공원",
+      "x": 271.0,
+      "y": 274.0,
+      "font": "serif",
+      "size": 29.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-28",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "dot",
+      "x": 692.0,
+      "y": 273.0,
+      "radius": 4.3,
+      "id": "ref-29",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "현대프리미엄아울렛",
+      "x": 689.0,
+      "y": 322.0,
+      "font": "serif",
+      "size": 32.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-30",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "SPACE 1",
+      "x": 689.0,
+      "y": 358.0,
+      "font": "sans",
+      "size": 24.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 2.0,
+      "angle": 0,
+      "id": "ref-31",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "dot",
+      "x": 437.0,
+      "y": 700.0,
+      "radius": 4.3,
+      "id": "ref-32",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "도농생태유수지",
+      "x": 420.0,
+      "y": 660.0,
+      "font": "serif",
+      "size": 27.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-33",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "dot",
+      "x": 498.0,
+      "y": 918.0,
+      "radius": 4.3,
+      "id": "ref-34",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "도농",
+      "x": 425.0,
+      "y": 859.0,
+      "font": "serif",
+      "size": 31.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-35",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "고등학교",
+      "x": 425.0,
+      "y": 903.0,
+      "font": "serif",
+      "size": 31.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-36",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "dot",
+      "x": 876.0,
+      "y": 880.0,
+      "radius": 4.3,
+      "id": "ref-37",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "도농근린공원",
+      "x": 878.0,
+      "y": 935.0,
+      "font": "serif",
+      "size": 30.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-38",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "다산현대프리미어",
+      "x": 733.0,
+      "y": 574.0,
+      "font": "serif",
+      "size": 28.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-39",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "캠퍼스몰",
+      "x": 733.0,
+      "y": 613.0,
+      "font": "serif",
+      "size": 28.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-40",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "파로스컨벤션",
+      "x": 715.0,
+      "y": 715.0,
+      "font": "serif",
+      "size": 44.0,
+      "weight": 700,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-41",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "E동 2층",
+      "x": 715.0,
+      "y": 757.0,
+      "font": "sans",
+      "size": 28.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 1.0,
+      "angle": 0,
+      "id": "ref-42",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          687.0,
+          780.0
+        ],
+        [
+          652.0,
+          815.0
+        ],
+        [
+          633.0,
+          845.0
+        ]
+      ],
+      "width": 1.35,
+      "id": "ref-43",
+      "tone": "soft",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "flower",
+      "x": 633.0,
+      "y": 871.0,
+      "radius": 28,
+      "id": "ref-44",
+      "tone": "ink",
+      "footer": false,
+      "hidden": false
+    },
+    {
+      "kind": "line",
+      "points": [
+        [
+          490.0,
+          1179.0
+        ],
+        [
+          910.0,
+          1179.0
+        ]
+      ],
+      "width": 1.1,
+      "id": "ref-45",
+      "tone": "line",
+      "footer": true,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "경기도 남양주시 다산순환로 20",
+      "x": 700.0,
+      "y": 1240.0,
+      "font": "serif",
+      "size": 32.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-46",
+      "tone": "ink",
+      "footer": true,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "다산현대프리미어캠퍼스몰 E동 2층",
+      "x": 700.0,
+      "y": 1286.0,
+      "font": "serif",
+      "size": 28.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-47",
+      "tone": "soft",
+      "footer": true,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "주차  GATE 2 진입 · 지하 3~4층",
+      "x": 700.0,
+      "y": 1344.0,
+      "font": "sans",
+      "size": 27.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 0.0,
+      "angle": 0,
+      "id": "ref-48",
+      "tone": "ink",
+      "footer": true,
+      "hidden": false
+    },
+    {
+      "kind": "text",
+      "text": "031-565-8000",
+      "x": 700.0,
+      "y": 1390.0,
+      "font": "sans",
+      "size": 24.0,
+      "weight": 400,
+      "anchor": "middle",
+      "spacing": 1.3,
+      "angle": 0,
+      "id": "ref-49",
+      "tone": "soft",
+      "footer": true,
+      "hidden": false
+    }
+  ]
+}

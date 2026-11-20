@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env*
+.DS_Store
+artifacts/
+reference/*
+!reference/Dasan20_Wedding_Map_Files/
+reference/Dasan20_Wedding_Map_Files/*
+!reference/Dasan20_Wedding_Map_Files/Dasan20_Wedding_Map_Editable.svg
+!reference/Dasan20_Wedding_Map_Files/Dasan20_Wedding_Map_Transparent.png
+!reference/Dasan20_Wedding_Map_Files/Dasan20_Wedding_Map.svg
