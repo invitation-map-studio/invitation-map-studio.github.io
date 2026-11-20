@@ -24,6 +24,7 @@ jobs:
       - name: Build static app
         env:
           VITE_LOCK_VERIFIER: ${{ vars.WEDDING_LOCK_VERIFIER }}
+          VITE_NAVER_PUBLIC_KEY: ${{ vars.VITE_NAVER_PUBLIC_KEY }}
         run: |
           node -e "if (!/^v1\.600000\.[0-9a-f]{32}\.[0-9a-f]{64}$/.test(process.env.VITE_LOCK_VERIFIER)) throw Error('Missing lock verifier')"
           npm run build

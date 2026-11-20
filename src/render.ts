@@ -61,7 +61,7 @@ export function render(project: Project, mapOnly = false, interactive = false) {
             text:
               project.origin === 'reference'
                 ? '원본 재현 · 위치 재확인 전'
-                : '확인 필요 시안 · 위치 미검수',
+                : '확인 필요 시안 · 출입구 미확인',
           }
         : item,
       project.spec.ink,

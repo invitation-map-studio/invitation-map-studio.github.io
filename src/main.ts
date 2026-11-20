@@ -34,6 +34,7 @@ import {
 } from './store'
 import { importProject } from './validate'
 import { closeNaver, showNaver } from './naver'
+import { localLocationCheck, markerPoint } from './location-check'
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const field = (id: string) => el<HTMLInputElement>(id)
 const sel = (id: string) => el<HTMLSelectElement>(id)
@@ -185,6 +186,7 @@ function fields() {
 }
 function paint() {
   if (!current) return
+  closeNaver(el('naver-map'))
   clearFiles()
   el('paper').replaceChildren(render(current, field('maponly').checked, true))
   el('project-title').textContent = current.name
@@ -200,7 +202,7 @@ function paint() {
   const review =
     current.review.status === 'checked'
       ? '사용자 위치 대조 ' + date(current.review.verifiedAt)
-      : '위치 대조 필요'
+      : '사용자 대조 기록 없음'
   el('meta').textContent = [
     type,
     review,
@@ -212,6 +214,11 @@ function paint() {
     .filter(Boolean)
     .join('  /  ')
   el('osm-credit').hidden = current.origin !== 'osm'
+  const check = localLocationCheck(current)
+  el('location-result').textContent = check ? '자동 대조 · ' + check.message : ''
+  const source = el<HTMLAnchorElement>('location-source')
+  source.hidden = !check?.source
+  if (check?.source) source.href = check.source
   el<HTMLAnchorElement>('review-map').href =
     'https://map.naver.com/p/search/' + encodeURIComponent(current.address)
   const entries = editable()
@@ -261,7 +268,6 @@ async function library() {
   }
 }
 async function use(p: Project, message: string) {
-  closeNaver(el('naver-map'))
   current = p
   current.lastAccessedAt = iso()
   history = []
@@ -350,6 +356,7 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
           ? '갱신 완료 · 변경된 지리 자료를 새 버전으로 저장했습니다.'
           : '갱신 완료',
   )
+  if (naverKey && !signal.aborted) void checkWithNaver()
 }
 function isDasan(address: string) {
   return [fixture.address, '남양주시 다산중앙로82번안길 74', '다산중앙로82번안길 74'].includes(
@@ -628,8 +635,10 @@ hook('download', async (signal) => {
       : '첨부 원본 검수일 2026-11-14',
     current.geo ? 'WGS84 · OSM 도로 ' + current.geo.roads.length + '개' : '',
     '조회 ' + date(current.lastSuccessfulFetchAt),
-    '위치 대조 ' + date(current.review.verifiedAt),
-    current.review.note || '위치 대조 필요',
+    el('location-result').textContent,
+    localLocationCheck(current)?.source,
+    '사용자 대조 ' + date(current.review.verifiedAt),
+    current.review.note,
     current.review.evidence ? JSON.stringify(current.review.evidence) : '',
     '보행·차량 입구 미확인',
     current.refreshFailed ? '이전 조회본 · 갱신 실패' : '',
@@ -671,9 +680,16 @@ hook('print-preview', async (signal) => {
 })
 const naverKey = import.meta.env.VITE_NAVER_PUBLIC_KEY
 el('naver').hidden = !naverKey
-hook('naver', async () => {
-  await showNaver(el('naver-map'), field('address').value || current.address, naverKey)
-})
+el('naver-notice').hidden = !naverKey
+async function checkWithNaver() {
+  const container = el('naver-map')
+  try {
+    await showNaver(container, current.address, naverKey, markerPoint(current))
+  } catch (error) {
+    container.textContent = error instanceof Error ? error.message : '네이버 위치 대조에 실패했습니다.'
+  }
+}
+hook('naver', checkWithNaver)
 el('relock').onclick = () => {
   busy?.abort()
   location.reload()

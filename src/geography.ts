@@ -1,6 +1,5 @@
 import { indexedAddresses } from './address-index'
-import evaluated from '../data/evaluation/addresses.json'
-import venues from './venues.json'
+import { registeredPlaces, mapScale } from './location-check'
 import { parseRoadAddress } from './road-address'
 import {
   baseItem,
@@ -14,7 +13,6 @@ import {
   type Spec,
 } from './model'
 
-const registered = [...evaluated, ...venues]
 
 interface Element {
   type: string
@@ -157,7 +155,7 @@ export async function fetchGeography(place: Place, signal: AbortSignal): Promise
   )
   if (!addressObject) throw Error('기존 목적지 객체를 다시 확인할 수 없습니다.')
   if (site) {
-    const known = registered.find((r) => r.site === place.id && r.address === place.address)
+    const known = registeredPlaces.find((r) => r.site === place.id && r.address === place.address)
     if (!known || addressObject.tags?.name !== known.name)
       throw Error('단지의 현재 명칭과 주소 근거를 다시 확인해 주세요.')
     const ring = addressObject.geometry
@@ -189,7 +187,7 @@ export async function fetchGeography(place: Place, signal: AbortSignal): Promise
       lat: +(o.lat + y / (3 * twiceArea)).toFixed(7),
     }
   } else if (place.entrance === 'site-bbox-center') {
-    const record = registered.find((r) => r.site === place.id && r.address === place.address)
+    const record = registeredPlaces.find((r) => r.site === place.id && r.address === place.address)
     const point = addressObject.center ?? addressObject
     if (!record || !coordinate(point.lat!, point.lon!))
       throw Error('기준 시설의 주소와 영역을 다시 확인해 주세요.')
@@ -388,9 +386,10 @@ function placement(
 export function layout(geo: Geography, name: string): Spec {
   const { place } = geo,
     scale = 440 / place.radius
+  const axes = mapScale(place)
   const project = ([lon, lat]: Point): Point => [
-    (lon - place.lon) * 111320 * Math.cos((place.lat * Math.PI) / 180) * scale + 700,
-    605 - (lat - place.lat) * 111320 * scale,
+    (lon - place.lon) * axes.x + axes.cx,
+    axes.cy - (lat - place.lat) * axes.y,
   ]
   const items: Item[] = [
     label('title', '오시는 길', 700, 86, 30, { spacing: 4 }),

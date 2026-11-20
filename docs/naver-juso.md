@@ -1,12 +1,12 @@
 # 네이버 실시간 확인과 Juso 좌표 연동 조건
 
-2026년 11월 20일 기준이다. 기본 약도에는 저장·가공 권한이 확인된 데이터만 넣는다. 네이버 확인 버튼은 화면 대조용이며 결과를 프로젝트, 로그, 파일 또는 이 앱의 캐시에 기록하지 않는다. [네이버 클라우드 Maps 이용약관](https://www.ncloud.com/policy/terms/maps)
+2026년 11월 20일 기준이다. 기본 약도에는 저장·가공 권한이 확인된 데이터만 넣는다. 네이버 자동 대조와 다시 대조 버튼은 화면 확인용이며 결과를 프로젝트, 로그, 파일 또는 이 앱의 캐시에 기록하지 않는다. [네이버 클라우드 Maps 이용약관](https://www.ncloud.com/policy/terms/maps)
 
 ## 네이버 확인 화면
 
 1. 시험용 Application에서 Web Dynamic Map과 Geocoding을 선택한다. 등록 웹 서비스 URL에는 실제 Pages 호스트를 입력한다. 콘솔에서 설정 형식과 허용 도메인을 확인한다. [Application 설정](https://guide.ncloud-docs.com/docs/maps-app) · [인증 문제 해결](https://guide.ncloud-docs.com/docs/maps-troubleshoot)
 2. 공급자에서 API별 일·월 한도와 초과 사용 불허를 설정한 뒤 시험용 브라우저 Client ID를 사용한다. JS SDK에는 ncpKeyId와 geocoder 서브모듈을 전달한다. 서버용 Client Secret은 사용하지 않는다. [JS SDK Client ID](https://navermaps.github.io/maps.js.ncp/docs/tutorial-1-Getting-Client-ID.html) · [Geocoder 사전 준비](https://navermaps.github.io/maps.js.ncp/docs/module-geocoder.html)
-3. 화면 잠금 해제 후 실시간 확인을 열면 주소를 네이버로 보낸다. 결과의 x는 경도, y는 위도다. 후보가 여러 개면 사용자가 하나를 선택한다. 표식은 주소 대표점에 놓으며 도보·주차장 입구 검수와는 별개다. [주소 검색 응답](https://navermaps.github.io/maps.js.ncp/docs/tutorial-Geocoder-Geocoding.html)
+3. GitHub Actions 저장소 변수 `VITE_NAVER_PUBLIC_KEY`에 브라우저용 Client ID를 등록하고 Pages를 재배포한다. 키가 설정되면 약도 생성 또는 갱신이 끝난 뒤 도로명주소로 네이버를 조회한다. 네이버 도로명주소와 현재 꽃 표식까지의 거리를 비교한다. 50m는 확인이 필요한 좌표 차이를 표시하기 위한 기준이다. 결과의 x는 경도, y는 위도다. 후보가 여러 개면 사용자가 하나를 선택한다. 표식은 주소 대표점에 놓으며 도보·주차장 입구 검수와는 별개다. [주소 검색 응답](https://navermaps.github.io/maps.js.ncp/docs/tutorial-Geocoder-Geocoding.html)
 4. 닫기는 지도와 주소 후보를 지운다. SDK 전송이 시작된 요청은 공급자 사용량에 잡힐 수 있다. 늦게 도착한 결과는 닫힌 화면에 그리지 않는다. 인증 오류, 검색 실패와 지연에 대한 자동 재시도는 없다. 인증 실패 후 재설정한 키를 적용하려면 새로고침한다. [지도 제거 메서드](https://navermaps.github.io/maps.js.ncp/docs/naver.maps.Map.html)
 
 ### CSP와 실제 점검 범위

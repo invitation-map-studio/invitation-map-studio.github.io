@@ -1,5 +1,5 @@
-// NAVER Maps JS SDK is loaded only by the location-check button. All response data
-// belongs to this view and is discarded when it closes.
+import { compareNaverAddress } from './location-check'
+import type { Point } from './model'
 interface AddressResult {
   roadAddress?: string
   jibunAddress?: string
@@ -134,6 +134,7 @@ export async function showNaver(
   container: HTMLElement,
   address: string,
   publicKey: string,
+  markerPoint?: Point,
 ): Promise<void> {
   const key = publicKey.trim()
   const query = address.trim()
@@ -172,7 +173,10 @@ export async function showNaver(
         marker.setMap(null)
         map.destroy()
       }
-      info.textContent = `${item.roadAddress || item.jibunAddress} · 주소 대표점. 출입구는 별도 확인이 필요합니다.`
+      const comparison = markerPoint
+        ? compareNaverAddress(address, item.roadAddress ?? '', [Number(item.x), Number(item.y)], markerPoint)
+        : '꽃 표식 좌표 확인 필요'
+      info.textContent = `네이버 위치 대조 · ${comparison}. 출입구는 별도 확인이 필요합니다.`
     }
     for (const item of matches) {
       const lon = Number(item?.x)
