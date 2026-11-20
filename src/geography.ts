@@ -856,7 +856,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
   }
   items.push(destination)
   // Keep the marker at its measured point while choosing a clear position for its name.
-  const venueSize = Math.max(24, Math.min(40, Math.floor(990 / Math.max(1, textWidth(name, 1)))))
+  let venueSize = Math.max(24, Math.min(40, Math.floor(990 / Math.max(1, textWidth(name, 1)))))
   const beside = textWidth(name, venueSize) / 2 + 38
   let venue: Placement | undefined
   for (const [dx, dy] of [
@@ -879,6 +879,20 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
   ]) {
     venue = placement(name, venueSize, 700 + dx, 605 + dy, 0, segments, occupied)
     if (venue) break
+  }
+  if (!venue) {
+    // Minor streets are drawn last and can leave space under the venue name.
+    // Try a compact label beside the pin before resorting to the top margin.
+    const mainSegments = obstacles(items.filter(i => i.id.startsWith('road-'))).segments
+    for (const size of [venueSize, Math.max(24, venueSize - 7), 24]) {
+      const side = textWidth(name,size)/2 + 42
+      for (const [dx,dy] of [[0,61],[0,-77],[side,-16],[-side,-16],[side,32],[-side,32],
+        [-45,77],[45,77],[-45,-85],[45,-85],[0,105]]) {
+        venue = placement(name,size,700+dx,605+dy,0,mainSegments,occupied)
+        if (venue) { venueSize = size; break }
+      }
+      if (venue) break
+    }
   }
   if (venue) {
     items.push(label('venue', name, venue.x, venue.y, venueSize, { weight: 700 }))

@@ -51,6 +51,7 @@ try {
     assert.ok(await paper.locator('circle[data-item="transit-stop-A"][fill="#fff"]').count())
     assert.ok(await paper.locator('[data-item="destination"] path').count())
     assert.equal(await paper.locator('[data-item^="dot-"],[data-item^="label-"]').count(),0)
+    assert.ok(Number(await paper.locator('[data-item="venue"]').getAttribute('y')) > 440)
     const buildings = await paper.locator('[data-item^="building-name-"]').allTextContents()
     assert.ok(buildings.length >= 2 && buildings.length <= 6, JSON.stringify(buildings))
     assert.equal(await paper.locator('rect[data-item^="building-mark-"]').count(), buildings.length)
