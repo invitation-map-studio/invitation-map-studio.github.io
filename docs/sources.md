@@ -54,3 +54,8 @@ python3 data/prepare_dasan74.py original.json dasan74.updated.json --fetched-at 
 ## 미니멀 인쇄용 도로
 
 주소를 검색하면 동일한 OSM 추출본에서 분할한 큰길 자료를 읽어 네이버 대조와 별도로 인쇄본을 만든다. `scripts/prepare-major-roads.py`는 motorway·trunk·primary·secondary·tertiary 등급의 도로를 좌표 타일로 저장한다. 작은 범위에 큰길이 없으면 최대 반경 1.5 km로 확대한다. 도로의 OSM 노드와 층위가 일치하고 세 갈래 이상으로 연결된 곳에 교차로 표식을 찍는다. 표시는 축척에 맞게 간추린다. 출처 시각은 원본 추출 시각을 사용하고, 실시간 갱신에 성공하면 해당 조회 시각을 기록한다. [큰길 타일 색인](../public/major-roads/index.json) · [동일 원천 파일의 해시](../public/address-index/source.json)
+
+
+## 인쇄용 주변 건물
+
+전국 OSM 추출본에서 이름과 용도가 확인되는 관공서·학교·병원·문화시설·호텔·상업 건물을 모았다. `scripts/prepare-buildings.py`로 같은 PBF에서 `public/buildings` 자료를 다시 생성할 수 있다. 지도 점은 등록된 좌표를, 건물 경계는 외곽 범위의 중심을 사용한다. 약도를 열 때 해당 구역 자료를 읽어 목적지와의 거리 및 시설 종류에 따라 최대 다섯 곳을 고른다. 같은 이름과 겹치는 표식을 걸러내고, 각 건물은 작은 사각형과 이름으로 그린다. [건물 색인과 원천 시각](../public/buildings/index.json) · [원천 파일의 해시](../public/address-index/source.json)

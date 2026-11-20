@@ -16,7 +16,7 @@ import {
   type Project,
   type Spec,
 } from './model'
-import { addresses, fetchGeography, layout } from './geography'
+import { addresses, buildingItems, fetchGeography, layout } from './geography'
 import { canonicalAddress, parseRoadAddress, mentionsVenue } from './road-address'
 import { render, serialize } from './render'
 import {
@@ -35,6 +35,7 @@ import {
 } from './store'
 import { importProject } from './validate'
 import { stationRadius, transitItems } from './transit'
+import { buildingsNear } from './buildings'
 import { indexedRoads } from './major-roads'
 import { closeNaver, showNaver } from './naver'
 import { localLocationCheck, markerPoint } from './location-check'
@@ -232,6 +233,7 @@ function paint() {
   const minimal = current.spec.layout === 'minimal'
   el('coverage').textContent = minimal ? [
     current.spec.items.some(i => i.id.startsWith('road-')) ? '' : '이 범위에 표시할 큰길 자료가 없습니다.',
+    current.spec.items.some(i => i.id.startsWith('building-name-')) ? '' : '이 약도에 표시된 주변 건물명이 없습니다.',
     current.spec.items.some(i => i.id.startsWith('transit-guide-')) ? '' : '1 km 이내에 등록된 지하철역이 없습니다.',
   ].filter(Boolean).join(' ') : ''
   const check = localLocationCheck(current)
@@ -242,6 +244,10 @@ function paint() {
   el<HTMLAnchorElement>('review-map').href =
     'https://map.naver.com/p/search/' + encodeURIComponent(current.address)
   const entries = editable()
+  const buildingNames = new Map<string, string>()
+  for (const i of entries)
+    if (i.kind === 'text' && i.id.startsWith('building-name-'))
+      buildingNames.set(i.id.replace('building-name-', 'building-mark-'), i.text)
   sel('element').replaceChildren(
     ...entries.map(
       (i) =>
@@ -251,6 +257,7 @@ function paint() {
             : i.kind === 'flower'
               ? '꽃 목적지 표식'
               : i.id.startsWith('transit-stop-') ? '역 표식 ' + i.id.slice(-1)
+              : i.id.startsWith('building-mark-') ? (buildingNames.get(i.id) ?? '건물') + ' 표식'
               : i.id.startsWith('junction-') ? '교차로 표식' : '시설 점 ' + i.id,
           i.id,
         ),
@@ -288,10 +295,27 @@ async function library() {
     area.append(b)
   }
 }
-async function use(p: Project, message: string) {
+async function use(p: Project, message: string, previous?: Project | null) {
   // Older saved drawings keep their edits while gaining the nearby station layer.
   if (p.geo && !p.spec.items.some(i => i.id.startsWith('transit-')))
     p.spec.items.push(...transitItems(p.geo.place))
+  if (p.geo && !p.imported && p.spec.layout === 'minimal' &&
+      !p.spec.items.some(item => item.id.startsWith('building-'))) {
+    const place = p.geo.place
+    const prior = previous?.geo && placeKey(previous.geo.place) === placeKey(place) ? previous : undefined
+    const buildings = await buildingsNear(place).catch(() => undefined)
+    if (buildings) {
+      const additions = buildingItems(p.spec, place, p.name, buildings)
+      if (prior?.geo) {
+        const oldLayout = layout(prior.geo, prior.name)
+        const baseline = new Map(buildingItems(oldLayout, place, prior.name, buildings).map(i => [i.id, i]))
+        const edits = new Map(prior.spec.items.map(i => [i.id, i]))
+        p.spec.items.push(...additions.map(i => sameItem(baseline.get(i.id), i) ? edits.get(i.id) ?? i : i))
+      } else p.spec.items.push(...additions)
+    } else if (prior) {
+      p.spec.items.push(...prior.spec.items.filter(i => i.id.startsWith('building-')))
+    }
+  }
   current = p
   current.lastAccessedAt = iso()
   history = []
@@ -364,6 +388,7 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
           : changed
             ? '갱신 완료 · 변경된 지리 자료를 새 버전으로 저장했습니다.'
             : '갱신 완료',
+      changed ? old : undefined,
     )
   }
   if (searching) {
@@ -502,7 +527,7 @@ el('search').onsubmit = (e) => {
 }
 async function makeAddress(place: Place, name: string, signal: AbortSignal, details: string,
   fallback?: Geography, fetchedAt = datasetAt) {
-  status('큰길과 가까운 지하철역을 찾고 있습니다.')
+  status('큰길과 주변 건물, 가까운 지하철역을 찾고 있습니다.')
   let seed
   try {
     seed = await indexedRoads(place, signal)

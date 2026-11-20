@@ -38,6 +38,9 @@ function draw(item: Item, ink: string) {
     g.append(letter)
     return g
   }
+  if (item.kind === 'dot' && item.id.startsWith('building-mark-'))
+    return svg('rect', { x: item.x - item.radius, y: item.y - item.radius, width: 2 * item.radius,
+      height: 2 * item.radius, rx: 1, fill })
   if (item.kind === 'dot') return svg('circle', { cx: item.x, cy: item.y, r: item.radius, fill })
   const g = svg('g', {
     transform: `translate(${item.x} ${item.y}) scale(${item.radius / 28})`,

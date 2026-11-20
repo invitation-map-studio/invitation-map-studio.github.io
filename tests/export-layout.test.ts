@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { layout } from '../src/geography'
-import type { Geography, Label, Point } from '../src/model'
+import { buildingItems, layout } from '../src/geography'
+import type { Building } from '../src/buildings'
+import type { Geography, Label, Point, Spec } from '../src/model'
 
 const fixture = JSON.parse(readFileSync(new URL('../data/dasan74.json', import.meta.url), 'utf8'))
 
@@ -98,4 +99,26 @@ test('세 갈래 큰길만 교차로로 표시하고 입체 교차·단순 분�
   assert.equal(draw(road(3,[2,4],'1/yes/')).filter(i=>i.id.startsWith('junction-')).length,0)
   const minor = draw(road(3,[2,4],'//','service'))
   assert.ok(!minor.some(i=>i.id.startsWith('junction-') || i.id.startsWith('road-3-')))
+})
+
+
+test('건물 이름과 표식이 도로·예식장·사용자 편집을 피하고 같은 이름은 한 번만 그린다', () => {
+  const g: Geography = fixture.geo
+  const place = g.place
+  const rows: Building[] = [
+    ['way/1', '도서관', place.lon - 0.0011, place.lat, 1],
+    ['node/2', '도서관', place.lon - 0.00112, place.lat, 2],
+    [place.id, '목적지 건물', place.lon - 0.0013, place.lat, 0],
+    ['way/3', '예식장', place.lon + 0.0013, place.lat, 0],
+  ]
+  const drawing: Spec = { layout: 'minimal', ink: '#333333', items: [] }
+  const items = buildingItems(drawing, place, '예식장', rows)
+  assert.deepEqual(items.map(i => i.id), ['building-mark-way/1', 'building-name-way/1'])
+  const marker = items[0]
+  assert.ok(marker.kind === 'dot')
+  drawing.items.push({...marker, id: 'transit-stop-A', radius: 20})
+  assert.deepEqual(buildingItems(drawing, place, '예식장', rows), [])
+  drawing.items = [{ kind: 'line', id:'road-1-0', tone:'soft', footer:false, hidden:false,
+    width:3, points:[[marker.x-20,marker.y], [marker.x+20,marker.y]] }]
+  assert.deepEqual(buildingItems(drawing, place, '예식장', rows), [])
 })

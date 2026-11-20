@@ -1,3 +1,4 @@
+import type { Building } from './buildings'
 import { mapBounds, transitItems } from './transit'
 import { indexedAddresses } from './address-index'
 import { registeredPlaces, mapScale } from './location-check'
@@ -344,16 +345,7 @@ function textWidth(text: string, size: number) {
   )
 }
 
-/** Bound the painted glyphs in their own coordinate system. Only nearby roads need an exact test. */
-function placement(
-  text: string,
-  size: number,
-  x: number,
-  y: number,
-  angle: number,
-  segments: Segment[],
-  occupied: Rect[],
-): Placement | undefined {
+function textFrame(text: string, size: number, x: number, y: number, angle: number) {
   const radians = (angle * Math.PI) / 180,
     cos = Math.cos(radians),
     sin = Math.sin(radians)
@@ -366,6 +358,20 @@ function placement(
     [local[0], local[3]],
   ]
   const bounds = envelope(corners.map(([u, v]) => [x + u * cos - v * sin, y + u * sin + v * cos]))
+  return { local, bounds, cos, sin }
+}
+
+/** Bound the painted glyphs in their own coordinate system. Only nearby roads need an exact test. */
+function placement(
+  text: string,
+  size: number,
+  x: number,
+  y: number,
+  angle: number,
+  segments: Segment[],
+  occupied: Rect[],
+): Placement | undefined {
+  const { local, bounds, cos, sin } = textFrame(text, size, x, y, angle)
   if (
     !inside([bounds[0], bounds[1]]) ||
     !inside([bounds[2], bounds[3]]) ||
@@ -384,6 +390,65 @@ function placement(
   )
     return
   return { x, y, angle, bounds }
+}
+
+/** Add building names around the actual drawing, including user-positioned text and symbols. */
+export function buildingItems(spec: Spec, place: Place, venue: string, buildings: Building[]): Item[] {
+  const occupied: Rect[] = []
+  const segments: Segment[] = []
+  for (const item of spec.items) {
+    if (item.hidden || item.footer || item.id.startsWith('building-')) continue
+    if (item.kind === 'text') {
+      occupied.push(textFrame(item.text, item.size, item.x, item.y, item.angle).bounds)
+    } else if (item.kind === 'line') {
+      for (let i = 1; i < item.points.length; i++) {
+        const a = item.points[i - 1], b = item.points[i]
+        segments.push({ a, b, length: distance(a, b), bounds: envelope([a, b]) })
+      }
+    } else {
+      const pad = item.radius + 6
+      occupied.push([item.x - pad, item.y - pad, item.x + pad, item.y + pad])
+    }
+  }
+
+  const axes = mapScale(place)
+  const normalizeName = (name: string) => name.replace(/\s+/g, '').toLowerCase()
+  const venueName = normalizeName(venue)
+  const candidates = buildings.map(([id, name, lon, lat, rank]) => {
+    const point: Point = [axes.cx + (lon - place.lon) * axes.x, axes.cy - (lat - place.lat) * axes.y]
+    const meters = distance(point, [axes.cx, axes.cy]) * place.radius / 440
+    return { id, name, point, key: normalizeName(name), score: meters + rank * 90 }
+  }).sort((a, b) => a.score - b.score || a.id.localeCompare(b.id))
+  const result: Item[] = []
+  const names = new Set<string>()
+  const marked: Point[] = []
+  const size = 24
+  for (const { id, name, point, key } of candidates) {
+    if (id === place.id || names.has(key) || key === venueName ||
+        (venueName.length >= 4 && key.includes(venueName))) continue
+    const [x, y] = point
+    const mark: Rect = [x - 7, y - 7, x + 7, y + 7]
+    if (!inside([mark[0], mark[1]]) || !inside([mark[2], mark[3]]) ||
+        occupied.some(rect => overlap(rect, mark)) || marked.some(p => distance(point, p) < 95) ||
+        segments.some(seg => overlap(seg.bounds, mark) && clip(seg.a, seg.b, mark).length)) continue
+    const beside = textWidth(name, size) / 2 + 14
+    const shift = textWidth(name, size) / 3
+    for (const [dx, dy] of [[beside, 9], [-beside, 9], [0, -15], [0, 39],
+      [-shift, -15], [shift, -15], [-shift, 39], [shift, 39]]) {
+      const position = placement(name, size, x + dx, y + dy, 0, segments, [...occupied, mark])
+      if (!position) continue
+      result.push(
+        { ...baseItem('building-mark-' + id, 'soft'), kind: 'dot', x, y, radius: 5 },
+        { ...label('building-name-' + id, name, position.x, position.y, size, { font: 'sans' }), tone: 'soft' },
+      )
+      names.add(key)
+      marked.push(point)
+      occupied.push(mark, position.bounds)
+      break
+    }
+    if (marked.length === 5) break
+  }
+  return result
 }
 
 const majorRoads = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
