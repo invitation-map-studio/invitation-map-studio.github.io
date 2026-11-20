@@ -306,31 +306,28 @@ el('search').onsubmit = (e) => {
       await make(knownGeo.place, name || fixture.name, false, signal)
       return
     }
-    const rows = catalog.filter(
-      (r) => r.address === address || r.address.split(' ').slice(-2).join(' ') === address,
+    status('도로명과 건물번호로 후보를 찾고 있습니다.')
+    const registered = catalog.filter(
+      (r) => r.address === address || r.address.endsWith(' ' + address),
     )
-    for (const r of rows) {
-      const b = document.createElement('button')
-      b.textContent = r.name + ' · ' + r.address + ' · 조사된 시설 선택'
-      b.onclick = action(async (s) => {
-        const geo = await r.load()
-        await seedGeography(geo, datasetAt)
-        await make(geo.place, name || r.name, false, s)
-      })
-      area.append(b)
-    }
-    if (rows.length) {
-      status(
-        '이 주소에 조사된 시설 후보가 있습니다. 방문할 시설을 선택해 주세요. 꽃은 시설 영역의 중심입니다.',
-      )
-      return
-    }
     const stored = (await snapshots())
       .map((s) => s.geo.place)
       .filter((p) => normalize(p.address) === address)
-    const list = stored.length
-      ? stored
-      : await navigator.locks.request('wedding-map-provider', () => addresses(address, signal))
+    let list: Place[] = stored
+    if (!list.length) {
+      try {
+        list = await navigator.locks.request('wedding-map-provider', () =>
+          addresses(address, signal, registered.length === 0),
+        )
+      } catch (error) {
+        if (!registered.length || signal.aborted) throw error
+      }
+    }
+    for (const row of registered) {
+      if (list.some((p) => p.id === row.site)) continue
+      const geo = await row.load()
+      list.push({ ...geo.place, address, display: row.name } as Place)
+    }
     if (!list.length)
       throw Error(
         '이 주소에 연결된 OSM 건물번호가 없습니다. 주소를 확인하거나 검증한 프로젝트 JSON을 열어 주세요.',
@@ -363,21 +360,19 @@ function showCandidates(list: Place[], name: string) {
     ]
       .filter(Boolean)
       .join(' · ')
-    b.onclick = action((s) =>
-      make(
-        {
-          id: p.id,
-          address: p.address,
-          entrance: p.entrance,
-          lat: p.lat,
-          lon: p.lon,
-          radius: p.radius,
-        },
-        name || p.address,
-        false,
-        s,
-      ),
-    )
+    b.onclick = action(async (signal) => {
+      const registered = catalog.find(
+        (r) => r.site === p.id && (r.address === p.address || r.address.endsWith(' ' + p.address)),
+      )
+      if (registered) {
+        const geo = await registered.load()
+        await seedGeography(geo, datasetAt)
+        await make(geo.place, name || registered.name, false, signal)
+        return
+      }
+      const { id, address, entrance, lat, lon, radius } = p
+      await make({ id, address, entrance, lat, lon, radius }, name || address, false, signal)
+    })
     el('candidates').append(b)
   }
 }

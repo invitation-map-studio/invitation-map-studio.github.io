@@ -55,7 +55,10 @@ async function request(statement: string, signal: AbortSignal) {
       if (![502, 503, 504].includes(response.status) || attempt === 2) return response
       await response.body?.cancel()
     } catch (error) {
-      if (signal.aborted || attempt === 2) throw error
+      if (signal.aborted) throw signal.reason
+      if (error instanceof DOMException && error.name === 'TimeoutError')
+        throw Error('지도 공급자 응답 시간이 초과됐습니다. 잠시 후 다시 확인해 주세요.')
+      if (attempt === 2) throw error
     }
     await waitForRetry(1500 * 2 ** attempt, signal)
   }
@@ -94,6 +97,7 @@ async function query(statement: string, signal: AbortSignal): Promise<Element[]>
 export async function addresses(
   input: string,
   signal: AbortSignal,
+  onlineIfMissing = true,
 ): Promise<(Place & { display: string })[]> {
   const address = normalize(input),
     match = address.match(/(?:^|\s)([가-힣a-zA-Z0-9·.]+(?:길|로))\s+(\d{1,5}(?:-\d{1,5})?)$/)
@@ -106,6 +110,7 @@ export async function addresses(
   } catch (error) {
     if (signal.aborted) throw error
   }
+  if (!onlineIfMissing) return []
   const filter = `["addr:housenumber"="${match[2]}"]["addr:street"="${match[1]}"](33,124,39,132)`
   const rows = await query(`nwr${filter};out meta center 30;`, signal)
   return rows.flatMap((e) => {
