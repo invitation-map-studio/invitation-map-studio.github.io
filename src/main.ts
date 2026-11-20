@@ -6,6 +6,7 @@ import { unlock, canSetup } from './lock'
 import {
   DAY,
   iso,
+  fresh,
   normalize,
   pending,
   placeKey,
@@ -16,6 +17,7 @@ import {
   type Spec,
 } from './model'
 import { addresses, fetchGeography, layout } from './geography'
+import { parseRoadAddress, mentionsVenue } from './road-address'
 import { render, serialize } from './render'
 import {
   archive,
@@ -26,6 +28,7 @@ import {
   readArchive,
   resolvePlace,
   save,
+  savedGeography,
   seedGeography,
   snapshots,
 } from './store'
@@ -57,14 +60,17 @@ for (const text of verifiedChecks) {
   label.append(box, text)
   el('review-checks').append(label)
 }
-function createProject(geo: Geography | null, name: string): Project {
+function createProject(geo: Geography | null, name: string, details = ''): Project {
+  const spec = geo ? layout(geo, name) : (structuredClone(reference) as Spec)
+  const detailLine = spec.items.find((item) => item.id === 'details')
+  if (detailLine?.kind === 'text') detailLine.text = details
   return {
     schema: 1,
     id: crypto.randomUUID(),
     name,
     address: geo?.place.address ?? '경기도 남양주시 다산순환로 20',
     origin: geo ? 'osm' : 'reference',
-    spec: geo ? layout(geo, name) : (structuredClone(reference) as Spec),
+    spec,
     geo,
     lastSuccessfulFetchAt: null,
     expiresAt: null,
@@ -84,9 +90,11 @@ let current: Project,
   selected = '',
   busy: AbortController | null = null
 let urls: string[] = []
+let searching = false
 function status(message: string, error = false) {
-  el('status').textContent = message
-  el('status').classList.toggle('error', error)
+  const output = el(searching ? 'search-status' : 'status')
+  output.textContent = message
+  output.classList.toggle('error', error)
 }
 function clearFiles() {
   for (const u of urls) URL.revokeObjectURL(u)
@@ -102,12 +110,24 @@ function link(file: Blob, name: string, parent: HTMLElement, caption = name) {
   parent.append(a)
   return a
 }
-function action(action: (s: AbortSignal) => Promise<void>) {
+function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 'studio' = 'studio') {
   return async () => {
     if (busy) return
     busy = new AbortController()
-    el('cancel').hidden = false
-    el('studio').querySelector('aside')!.inert = true
+    searching = origin === 'search'
+    const controls = searching
+      ? document.querySelectorAll<HTMLElement>(
+          '#search,#candidates,aside section:not(:first-child),#naver',
+        )
+      : document.querySelectorAll<HTMLElement>('#studio aside')
+    const cancel = el(searching ? 'search-cancel' : 'cancel')
+    cancel.hidden = false
+    controls.forEach((control) => (control.inert = true))
+    if (searching) {
+      el('search-preview').hidden = true
+      el('search-submit').textContent = '조회 중…'
+      el('search-submit').setAttribute('aria-busy', 'true')
+    }
     try {
       await action(busy.signal)
     } catch (e) {
@@ -121,15 +141,29 @@ function action(action: (s: AbortSignal) => Promise<void>) {
       )
     } finally {
       busy = null
-      el('cancel').hidden = true
-      el('studio').querySelector('aside')!.inert = false
+      controls.forEach((control) => (control.inert = false))
+      cancel.hidden = true
+      if (searching) {
+        el('search-submit').textContent = '주소로 약도 만들기'
+        el('search-submit').removeAttribute('aria-busy')
+      }
+      searching = false
     }
   }
 }
 function hook(id: string, fn: (s: AbortSignal) => Promise<void>) {
   el(id).addEventListener('click', action(fn))
 }
-el('cancel').onclick = () => busy?.abort()
+function searchAction(fn: (signal: AbortSignal) => Promise<void>) {
+  return action(fn, 'search')
+}
+el('cancel').onclick = el('search-cancel').onclick = () => busy?.abort()
+function clearSearch() {
+  el('search-preview').hidden = true
+  el('search-status').textContent = ''
+  el('candidates').replaceChildren()
+}
+el('search').addEventListener('input', clearSearch)
 const editable = () => current.spec.items.filter((i) => i.kind !== 'line')
 const item = () => current.spec.items.find((i) => i.id === selected)
 function fields() {
@@ -222,11 +256,13 @@ async function use(p: Project, message: string) {
   current.lastAccessedAt = iso()
   history = []
   selected = ''
+  if (!searching) clearSearch()
   el('candidates').replaceChildren()
   paint()
   await save(current)
   await library()
-  status(message)
+  status(searching ? p.name + ' 약도를 열었습니다. ' + message : message)
+  if (searching) el('search-preview').hidden = false
 }
 async function modify(next: Project) {
   history.push(structuredClone(current))
@@ -252,15 +288,29 @@ function revised(old: Project, geo: Geography, name: string): Project {
   )
   return p
 }
-async function make(place: Place, name: string, force: boolean, signal: AbortSignal) {
-  const old =
-    current.geo && placeKey(current.geo.place) === placeKey(place) && current.name === name
+async function make(place: Place, name: string, force: boolean, signal: AbortSignal, details = '') {
+  const footer = current.spec.items.find((item) => item.id === 'details')
+  let old =
+    current.geo &&
+    placeKey(current.geo.place) === placeKey(place) &&
+    current.name === name &&
+    (!searching || (footer?.kind === 'text' && footer.text === details))
       ? current
       : null
   status('지도 자료를 확인하고 있습니다.')
+  if (searching && !old) {
+    const stored = await savedGeography(place)
+    signal.throwIfAborted()
+    if (stored && !fresh(stored, Date.now())) {
+      old = createProject(stored.geo, name, details)
+      old.lastSuccessfulFetchAt = stored.lastSuccessfulFetchAt
+      old.expiresAt = stored.expiresAt
+      await use(old, '보관본으로 최신 도로 자료를 확인하고 있습니다.')
+    }
+  }
   let result
   try {
-    result = await resolvePlace(place, force, () => fetchGeography(place, signal))
+    result = await resolvePlace(place, force, () => fetchGeography(place, signal), signal)
   } catch (e) {
     if (old && !signal.aborted) {
       old.refreshFailed = true
@@ -271,9 +321,11 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
     }
     throw e
   }
+  signal.throwIfAborted()
   const { snap, state } = result,
     changed = old && JSON.stringify(old.geo) !== JSON.stringify(snap.geo)
-  const p = changed ? revised(old, snap.geo, name) : (old ?? createProject(snap.geo, name))
+  const p =
+    old && changed ? revised(old, snap.geo, name) : (old ?? createProject(snap.geo, name, details))
   p.lastSuccessfulFetchAt = snap.lastSuccessfulFetchAt
   p.expiresAt = snap.expiresAt
   p.imported = false
@@ -296,27 +348,37 @@ function isDasan(address: string) {
 }
 el('search').onsubmit = (e) => {
   e.preventDefault()
-  void action(async (signal) => {
-    const address = normalize(field('address').value),
-      name = normalize(field('placename').value)
-    if (!address) throw Error('도로명주소를 입력해 주세요.')
+  void searchAction(async (signal) => {
+    clearSearch()
+    const input = field('address').value
+    if (!input.trim()) throw Error('도로명주소를 입력해 주세요. 예: 세종대로 124')
+    const { address, details } = parseRoadAddress(input)
+    const name = normalize(field('placename').value)
     const area = el('candidates')
-    area.replaceChildren()
     if (isDasan(address)) {
-      await make(knownGeo.place, name || fixture.name, false, signal)
+      await make(knownGeo.place, name || fixture.name, false, signal, details)
       return
     }
     status('도로명과 건물번호로 후보를 찾고 있습니다.')
     const registered = catalog.filter(
       (r) => r.address === address || r.address.endsWith(' ' + address),
     )
+    const named = registered.filter((r) => name === r.name || mentionsVenue(details, r.name))
+    if (named.length === 1) {
+      const venue = named[0]
+      status(venue.name + '의 지도 자료를 확인하고 있습니다.')
+      const geo = await venue.load()
+      await seedGeography(geo, datasetAt)
+      await make(geo.place, name || venue.name, false, signal, details)
+      return
+    }
     const stored = (await snapshots())
       .map((s) => s.geo.place)
       .filter((p) => normalize(p.address) === address)
     let list: Place[] = stored
     if (!list.length) {
       try {
-        list = await navigator.locks.request('wedding-map-provider', () =>
+        list = await navigator.locks.request('wedding-map-provider', { signal }, () =>
           addresses(address, signal, registered.length === 0),
         )
       } catch (error) {
@@ -326,7 +388,7 @@ el('search').onsubmit = (e) => {
     for (const row of registered) {
       if (list.some((p) => p.id === row.site)) continue
       const geo = await row.load()
-      list.push({ ...geo.place, address, display: row.name } as Place)
+      list.unshift({ ...geo.place, address })
     }
     if (!list.length)
       throw Error(
@@ -335,43 +397,51 @@ el('search').onsubmit = (e) => {
     if (stored.length) {
       const b = document.createElement('button')
       b.textContent = '같은 주소의 다른 후보 다시 조회'
-      b.onclick = action(async (s) => {
-        const found = await navigator.locks.request('wedding-map-provider', () =>
+      b.onclick = searchAction(async (s) => {
+        status('주소 후보를 다시 조회하고 있습니다.')
+        const found = await navigator.locks.request('wedding-map-provider', { signal: s }, () =>
           addresses(address, s),
         )
         area.replaceChildren()
-        showCandidates(found, name)
+        showCandidates(found, name, details)
         status(found.length ? '조회한 위치를 선택해 주세요.' : '추가 후보가 없습니다.')
       })
       area.append(b)
     }
     status('조회한 대표점 중 제작할 위치를 선택해 주세요. 행정구역과 입구를 확인하세요.')
-    showCandidates(list, name)
+    showCandidates(list, name, details)
   })()
 }
-function showCandidates(list: Place[], name: string) {
+function showCandidates(list: Place[], name: string, details: string) {
   for (const p of list) {
+    const registered = catalog.find(
+      (r) => r.site === p.id && (r.address === p.address || r.address.endsWith(' ' + p.address)),
+    )
     const b = document.createElement('button')
     b.textContent = [
-      'display' in p ? p.display : '',
+      registered?.name || ('display' in p ? p.display : ''),
       p.address,
       p.id,
       p.lat.toFixed(5) + ', ' + p.lon.toFixed(5),
     ]
       .filter(Boolean)
       .join(' · ')
-    b.onclick = action(async (signal) => {
-      const registered = catalog.find(
-        (r) => r.site === p.id && (r.address === p.address || r.address.endsWith(' ' + p.address)),
-      )
+    b.onclick = searchAction(async (signal) => {
+      status('선택한 장소의 지도 자료를 확인하고 있습니다.')
       if (registered) {
         const geo = await registered.load()
         await seedGeography(geo, datasetAt)
-        await make(geo.place, name || registered.name, false, signal)
+        await make(geo.place, name || registered.name, false, signal, details)
         return
       }
       const { id, address, entrance, lat, lon, radius } = p
-      await make({ id, address, entrance, lat, lon, radius }, name || address, false, signal)
+      await make(
+        { id, address, entrance, lat, lon, radius },
+        name || address,
+        false,
+        signal,
+        details,
+      )
     })
     el('candidates').append(b)
   }

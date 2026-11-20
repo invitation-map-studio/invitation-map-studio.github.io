@@ -109,14 +109,20 @@ export async function seedGeography(geo: Geography, fetchedAt: string) {
     await put('geo', key, snap)
   })
 }
+export const savedGeography = (place: Place) => get<Snapshot>('geo', placeKey(place))
 const pending = new Map<string, Promise<FetchOutcome>>()
-export function resolvePlace(place: Place, force: boolean, fetcher: () => Promise<Geography>) {
+export function resolvePlace(
+  place: Place,
+  force: boolean,
+  fetcher: () => Promise<Geography>,
+  signal?: AbortSignal,
+) {
   const key = placeKey(place)
   if (pending.has(key)) return pending.get(key)!
   const operation = (async () => {
     const before = await get<Snapshot>('geo', key)
     // Serialize network and commit across tabs. Coalesce a refresh already finished by another tab.
-    return navigator.locks.request('wedding-map-provider', async () => {
+    return navigator.locks.request('wedding-map-provider', { signal }, async () => {
       const previous = await get<Snapshot>('geo', key)
       const result = await resolveSnapshot(
         previous,

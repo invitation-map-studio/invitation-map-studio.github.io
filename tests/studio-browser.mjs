@@ -40,12 +40,24 @@ try {
   await page.locator('#studio').waitFor({ state: 'visible' })
   assert.match(await page.locator('#project-title').innerText(), /자연앤푸르지오/)
   await page.screenshot({ path: dir + '/studio-desktop.jpg', type: 'jpeg' })
+  await page.locator('#search-submit').click()
+  await page.waitForFunction(() =>
+    document.querySelector('#search-status').textContent.includes('도로명주소를 입력'),
+  )
+  await page.locator('#address').fill('세종대로')
+  await page.locator('#search-submit').click()
+  await page.waitForFunction(() =>
+    document.querySelector('#search-status').classList.contains('error'),
+  )
+  const messageBox = await page.locator('#search-status').boundingBox()
+  assert.ok(messageBox && messageBox.y + messageBox.height <= 960)
+  check('주소 오류를 검색 버튼 바로 아래에 표시')
   await page.locator('#address').fill('다산중앙로82번안길 74')
   await page.locator('#search button').click()
   await page.waitForFunction(
     () =>
-      document.querySelector('#status').textContent.includes('저장본 재사용') ||
-      document.querySelector('#status').textContent.includes('갱신'),
+      document.querySelector('#search-status').textContent.includes('저장본 재사용') ||
+      document.querySelector('#search-status').textContent.includes('갱신'),
   )
   check('주소 입력으로 다산74 생성 또는 재사용')
   await page.locator('#element').selectOption('venue')
@@ -68,13 +80,11 @@ try {
   const backupPath = await (await backup).path(),
     saved = JSON.parse(readFileSync(backupPath, 'utf8'))
   assert.equal(saved.geo.place.id, 'way/825237097')
-  await page
-    .locator('#import')
-    .setInputFiles({
-      name: 'project.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify(saved)),
-    })
+  await page.locator('#import').setInputFiles({
+    name: 'project.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(saved)),
+  })
   await page.waitForFunction(() =>
     document.querySelector('#meta').textContent.includes('최신성 미확인'),
   )

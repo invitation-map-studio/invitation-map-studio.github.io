@@ -24,8 +24,8 @@ def grid(point):
     return (math.floor(point[0] * 100), math.floor(point[1] * 100))
 
 
-def evaluate(pbf, directory):
-    sites = json.loads((ROOT / "addresses.json").read_text())
+def evaluate(pbf, directory, site_file=ROOT / "addresses.json"):
+    sites = json.loads(site_file.read_text())
     expected = {tuple(r["address"].split()[-2:]) for r in sites}
     references = {r["site"] for r in sites}
     candidates = defaultdict(list)
@@ -128,6 +128,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pbf")
     parser.add_argument("output", type=Path)
+    parser.add_argument("--sites", type=Path, default=ROOT / "addresses.json")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    evaluate(args.pbf, args.output)
+    evaluate(args.pbf, args.output, args.sites)

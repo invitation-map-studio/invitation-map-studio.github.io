@@ -53,25 +53,28 @@
         <aside>
           <section>
             <h2>장소 찾기</h2>
-            <form id="search">
+            <form id="search" novalidate>
               <label for="address">도로명주소</label
               ><input
                 id="address"
                 maxlength="160"
-                placeholder="다산중앙로82번안길 74"
+                placeholder="예: 세종대로 124 (한국프레스센터 19층)"
                 required
               /><label for="placename">청첩장에 쓸 장소명</label
               ><input id="placename" maxlength="54" placeholder="장소명 또는 건물명" /><button
-                class="primary"
+                class="primary" id="search-submit" type="submit"
               >
                 주소로 약도 만들기
               </button>
             </form>
+            <p id="search-status" role="status" aria-live="polite"></p>
+            <button id="search-cancel" type="button" hidden>조회 취소</button>
+            <a id="search-preview" href="#project-title" hidden>생성된 약도 보기</a>
+            <div id="candidates"></div>
             <p class="fine">
               도로명 색인에서 후보를 찾습니다. 실시간 조회 시 도로명·건물번호 또는 좌표를 Overpass에 전송합니다. 프로젝트는 이
               브라우저에 저장합니다.
             </p>
-            <div id="candidates"></div>
             <button id="naver" hidden>네이버 지도에서 위치 확인</button>
             <div id="naver-map"></div>
           </section>

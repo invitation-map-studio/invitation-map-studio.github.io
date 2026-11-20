@@ -1,10 +1,11 @@
 import { indexedAddresses } from './address-index'
-import registered from '../data/evaluation/addresses.json'
+import evaluated from '../data/evaluation/addresses.json'
+import venues from './venues.json'
+import { parseRoadAddress } from './road-address'
 import {
   baseItem,
   coordinate,
   label,
-  normalize,
   type Geography,
   type Item,
   type Place,
@@ -12,6 +13,8 @@ import {
   type Road,
   type Spec,
 } from './model'
+
+const registered = [...evaluated, ...venues]
 
 interface Element {
   type: string
@@ -99,19 +102,17 @@ export async function addresses(
   signal: AbortSignal,
   onlineIfMissing = true,
 ): Promise<(Place & { display: string })[]> {
-  const address = normalize(input),
-    match = address.match(/(?:^|\s)([가-힣a-zA-Z0-9·.]+(?:길|로))\s+(\d{1,5}(?:-\d{1,5})?)$/)
-  if (!match) throw Error('도로명과 건물번호까지 입력해 주세요. 예시: 다산중앙로82번안길 74')
+  const { address, street, number } = parseRoadAddress(input)
   // The extract identifies possible objects. Their current address and position are checked
   // again by ID before a successful geographic refresh can be recorded.
   try {
-    const candidates = await indexedAddresses(address, match[1], match[2], signal)
+    const candidates = await indexedAddresses(address, street, number, signal)
     if (candidates.length) return candidates
   } catch (error) {
     if (signal.aborted) throw error
   }
   if (!onlineIfMissing) return []
-  const filter = `["addr:housenumber"="${match[2]}"]["addr:street"="${match[1]}"](33,124,39,132)`
+  const filter = `["addr:housenumber"="${number}"]["addr:street"="${street}"](33,124,39,132)`
   const rows = await query(`nwr${filter};out meta center 30;`, signal)
   return rows.flatMap((e) => {
     const c = e.center ?? e
