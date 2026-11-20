@@ -1,4 +1,5 @@
 import './style.css'
+import { setProgress } from './progress'
 import reference from './reference.json'
 import fixture from '../data/dasan74.json'
 import { catalog, datasetAt } from './catalog'
@@ -116,11 +117,12 @@ function link(file: Blob, name: string, parent: HTMLElement, caption = name) {
   parent.append(a)
   return a
 }
-function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 'studio' | 'review' = 'studio') {
+function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 'studio' | 'review' = 'studio', label = '작업 중') {
   return async () => {
     if (busy) return
     busy = new AbortController()
     searching = origin === 'search'
+    setProgress('work', searching ? '주소 조회 중' : origin === 'review' ? '대조 기록 저장 중' : label)
     const reviewButton = el<HTMLButtonElement>('review')
     reviewButton.disabled = true
     reviewButton.textContent = origin === 'review' ? '저장 중…' : searching ? '지도 조회 중…' : '작업 진행 중…'
@@ -150,6 +152,7 @@ function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 's
         origin === 'review' ? 'review-status' : undefined,
       )
     } finally {
+      setProgress('work')
       busy = null
       reviewButton.disabled = false
       reviewButton.textContent = '대조 기록 저장'
@@ -163,8 +166,8 @@ function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 's
     }
   }
 }
-function hook(id: string, fn: (s: AbortSignal) => Promise<void>) {
-  el(id).addEventListener('click', action(fn))
+function hook(id: string, fn: (s: AbortSignal) => Promise<void>, label?: string) {
+  el(id).addEventListener('click', action(fn, 'studio', label))
 }
 function searchAction(fn: (signal: AbortSignal) => Promise<void>) {
   return action(fn, 'search')
@@ -344,6 +347,7 @@ async function library() {
   }
 }
 async function use(p: Project, message: string, previous?: Project | null) {
+  setProgress('work', '약도 불러오는 중')
   if (p.geo && !p.imported) {
     const guides = p.spec.items.filter(i => i.id.startsWith('transit-'))
     // Replace the original station-center layer only when its labels and pins are unedited.
@@ -521,9 +525,11 @@ async function searchAddress(address: string, name: string, details: string, sig
     if (!list.length) {
       if (!naverKey) throw Error('작업실 주소 자료에 없는 주소입니다. 네이버 위치 확인 설정이 필요합니다.')
       el('fallback-status').textContent = '네이버 주소 위치와 작업실 건물 도형을 대조하고 있습니다.'
+      setProgress('work')
       const reference = await showNaver(el('naver-map'), address, naverKey, undefined, signal)
       signal.throwIfAborted()
       if (!reference) throw Error('네이버 주소 선택을 마치지 않았습니다.')
+      setProgress('work', '건물 위치 확인 중')
       const match = reference.address && parseRoadAddress(reference.address)
       const region = address.split(' ').slice(0, -2)
       if (!match || match.street !== parsed.street || match.number !== parsed.number ||
@@ -590,6 +596,7 @@ async function searchAddress(address: string, name: string, details: string, sig
 }
 async function makeAddress(place: Place, name: string, signal: AbortSignal, details: string,
   fallback?: Geography, fetchedAt = datasetAt) {
+  setProgress('work', '주변 도로와 지하철 출구 조회 중')
   status('큰길과 주변 건물, 가까운 지하철역을 찾고 있습니다.')
   let seed
   try {
@@ -643,7 +650,7 @@ hook('refresh', (s) => {
     return makeAddress(place, current.name, s, footer?.kind === 'text' ? footer.text : '', current.geo!)
   }
   return make(place, current.name, true, s)
-})
+}, '최신 도로 자료 조회 중')
 hook('open', async () => {
   const p = (await projects()).find((p) => p.id === sel('saved').value)
   if (p) await use(p, '저장된 프로젝트를 열었습니다.')
@@ -833,11 +840,16 @@ hook('download', async (signal) => {
       readme,
       verification,
     },
-    { signal, onProgress: (_n, d, t) => status(`인쇄 파일 생성 중 · ${d}/${t}`) },
+    { signal, onProgress: (_name, done, total) => {
+      if (done < total) setProgress('work', '인쇄 파일 생성 중', done, total)
+      else setProgress('work', 'ZIP 파일 압축 중')
+      status(`인쇄 파일 생성 중 · ${done}/${total}`)
+    } },
   )
   link(result.zip, result.zipName, target, '전체 ZIP 다운로드')
   for (const [name, blob] of result.files)
     link(blob, name, target, name.slice(name.indexOf('_') + 1))
+  setProgress('work', '인쇄 파일 보관 중')
   try {
     await archive(key, current.id, result.zipName, result.zip)
     await library()
@@ -845,7 +857,7 @@ hook('download', async (signal) => {
   } catch {
     status('파일을 생성했습니다. 기기 저장 공간이 부족하면 지금 ZIP을 다운로드해 주세요.', true)
   }
-})
+}, '인쇄 파일 준비 중')
 hook('print-preview', async (signal) => {
   const { exportPreview } = await import('./export')
   const blob = await exportPreview(serialize(current), signal)
@@ -857,7 +869,7 @@ hook('print-preview', async (signal) => {
   img.style.width = '100%'
   el('downloads').append(img)
   status('150 dpi 인쇄 미리보기를 생성했습니다.')
-})
+}, '인쇄 미리보기 생성 중')
 const naverKey = import.meta.env.VITE_NAVER_PUBLIC_KEY
 el('naver').hidden = !naverKey
 el('naver-notice').hidden = !naverKey
@@ -877,7 +889,7 @@ hook('naver', async () => {
   const checked = checkWithNaver()
   el('naver-map').scrollIntoView({ block: 'center' })
   await checked
-})
+}, '네이버 위치 대조 중')
 el('relock').onclick = () => {
   busy?.abort()
   location.reload()
@@ -891,6 +903,7 @@ el('unlock').onsubmit = async (e) => {
   e.preventDefault()
   const btn = el<HTMLButtonElement>('enter')
   btn.disabled = true
+  setProgress('work', '작업실 여는 중')
   try {
     const input = field('password'),
       value = input.value
@@ -909,6 +922,7 @@ el('unlock').onsubmit = async (e) => {
   } catch (e) {
     el('gate-error').textContent = e instanceof Error ? e.message : '작업실을 열 수 없습니다.'
   } finally {
+    setProgress('work')
     btn.disabled = false
   }
 }

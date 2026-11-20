@@ -302,6 +302,48 @@ footer {
 .paper svg text {
   user-select: none;
 }
+#work-progress {
+  position: fixed;
+  z-index: 100;
+  top: max(.75rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(20rem, calc(100% - 2rem));
+  padding: .75rem 1rem .85rem;
+  background: #fffdf9;
+  border: 1px solid var(--border);
+  border-radius: .6rem;
+  box-shadow: 0 3px 14px #493b2a24;
+  pointer-events: none;
+}
+.progress-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: .6rem;
+  margin-bottom: .5rem;
+  font-size: .88rem;
+  font-weight: 600;
+}
+#progress-count { font-variant-numeric: tabular-nums; color: var(--rose); }
+#progress-bar { overflow: hidden; height: .35rem; background: #e9dfdc; border-radius: 1rem; }
+#progress-bar::before {
+  content: '';
+  display: block;
+  height: 100%;
+  background: var(--rose);
+  border-radius: inherit;
+  transform-origin: left;
+}
+#progress-bar[aria-valuenow]::before { transform: scaleX(var(--filled)); }
+#progress-bar:not([aria-valuenow])::before {
+  width: 40%;
+  animation: loading-sweep 1.25s ease-in-out infinite alternate;
+}
+@keyframes loading-sweep { to { transform: translateX(150%); } }
+@media (prefers-reduced-motion: reduce) {
+  #progress-bar:not([aria-valuenow])::before { animation: none; margin: auto; }
+}
+@media print { #work-progress { display: none; } }
 [hidden] {
   display: none !important;
 }

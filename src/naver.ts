@@ -1,3 +1,4 @@
+import { setProgress } from './progress'
 import { compareNaverAddress } from './location-check'
 import type { Point } from './model'
 import { nearbyStations } from './transit'
@@ -171,6 +172,11 @@ export async function showNaver(
   info.setAttribute('role', 'status')
   info.textContent = '네이버 지도에서 주소를 조회하고 있습니다.'
   container.replaceChildren(close, info)
+  setProgress('naver', '네이버 위치 대조 중')
+  const stopProgress = () => {
+    if (view === current) setProgress('naver')
+  }
+  controller.signal.addEventListener('abort', stopProgress, { once: true })
   try {
     const maps = await loadSdk(key)
     if (controller.signal.aborted || !container.isConnected) return
@@ -231,6 +237,7 @@ export async function showNaver(
       selected = resolve
       controller.signal.addEventListener('abort', () => resolve(undefined), { once: true })
     })
+    stopProgress()
     info.textContent = '확인할 주소 후보를 선택해 주세요.'
     for (const item of matches) {
       const button = document.createElement('button')
@@ -249,6 +256,8 @@ export async function showNaver(
     closeNaver(container)
     throw error
   } finally {
+    stopProgress()
+    controller.signal.removeEventListener('abort', stopProgress)
     pickForPrint?.removeEventListener('abort', cancel)
   }
 }
