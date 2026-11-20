@@ -29,6 +29,15 @@ function draw(item: Item, ink: string) {
     if (item.angle) el.setAttribute('transform', `rotate(${item.angle} ${item.x} ${item.y})`)
     return el
   }
+  if (item.kind === 'dot' && item.id.startsWith('transit-stop-')) {
+    const g = svg('g', {transform: `translate(${item.x} ${item.y})`})
+    g.append(svg('circle', {r: item.radius, fill: ink, stroke: '#fff', 'stroke-width': 3}))
+    const letter = svg('text', {x: 0, y: 7, 'text-anchor': 'middle', 'font-size': 20,
+      'font-family': 'Noto Sans CJK KR', 'font-weight': 400, fill: '#fff'})
+    letter.textContent = item.id.slice('transit-stop-'.length)
+    g.append(letter)
+    return g
+  }
   if (item.kind === 'dot') return svg('circle', { cx: item.x, cy: item.y, r: item.radius, fill })
   const g = svg('g', {
     transform: `translate(${item.x} ${item.y}) scale(${item.radius / 28})`,

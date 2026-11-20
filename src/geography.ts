@@ -1,3 +1,4 @@
+import { mapBounds, transitItems } from './transit'
 import { indexedAddresses } from './address-index'
 import { registeredPlaces, mapScale } from './location-check'
 import { parseRoadAddress } from './road-address'
@@ -261,7 +262,7 @@ export async function fetchGeography(place: Place, signal: AbortSignal): Promise
   return { source: 'osm', place, roads, landmarks }
 }
 type Rect = [number, number, number, number]
-const box: Rect = [76, 160, 1324, 1045]
+const box: Rect = [...mapBounds]
 const inside = (p: Point) => p[0] >= box[0] && p[1] >= box[1] && p[0] <= box[2] && p[1] <= box[3]
 const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1])
 function distanceToLine(p: Point, a: Point, b: Point) {
@@ -455,7 +456,11 @@ export function layout(geo: Geography, name: string): Spec {
     flush()
   }
 
+  const transit = transitItems(place)
   const occupied: Rect[] = [[664, 569, 736, 641]]
+  for (const stop of transit) {
+    if (stop.kind === 'dot') occupied.push([stop.x - 19, stop.y - 19, stop.x + 19, stop.y + 19])
+  }
   items.push({ ...baseItem('destination'), kind: 'flower', x: 700, y: 605, radius: 28 })
   // Keep the marker at its measured point while choosing a clear position for its name.
   const venueSize = Math.max(24, Math.min(40, Math.floor(990 / Math.max(1, textWidth(name, 1)))))
@@ -593,6 +598,7 @@ export function layout(geo: Geography, name: string): Spec {
     }
   }
   items.push(
+    ...transit,
     {
       ...baseItem('divider', 'line'),
       kind: 'line',

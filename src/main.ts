@@ -33,6 +33,7 @@ import {
   snapshots,
 } from './store'
 import { importProject } from './validate'
+import { transitItems } from './transit'
 import { closeNaver, showNaver } from './naver'
 import { localLocationCheck, markerPoint } from './location-check'
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -230,7 +231,7 @@ function paint() {
             ? i.text || '빈 안내 문구'
             : i.kind === 'flower'
               ? '꽃 목적지 표식'
-              : '시설 점 ' + i.id,
+              : i.id.startsWith('transit-stop-') ? '역 표식 ' + i.id.slice(-1) : '시설 점 ' + i.id,
           i.id,
         ),
     ),
@@ -268,6 +269,9 @@ async function library() {
   }
 }
 async function use(p: Project, message: string) {
+  // Older saved drawings keep their edits while gaining the nearby station layer.
+  if (p.geo && !p.spec.items.some(i => i.id.startsWith('transit-')))
+    p.spec.items.push(...transitItems(p.geo.place))
   current = p
   current.lastAccessedAt = iso()
   history = []

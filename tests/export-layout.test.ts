@@ -65,3 +65,20 @@ test('다산74의 목적지·도로명·시설명과 도로선이 교차하지 �
     }
   }
 })
+
+test('한국프레스센터 출구 두 곳을 지도와 지도 전용 인쇄 영역에 함께 배치한다', async () => {
+  const geo = JSON.parse(readFileSync(new URL('../src/samples/press-center.json', import.meta.url), 'utf8'))
+  const { transitItems } = await import('../src/transit')
+  const items = layout(geo, '한국프레스센터').items
+  const guides = items.filter(i => i.kind === 'text' && i.id.startsWith('transit-guide-'))
+  assert.deepEqual(guides.map(i => i.kind === 'text' && i.text), [
+    'A   시청역 4번 출구  ·  1·2호선 · 도보 3분',
+    'B   광화문역 5번 출구  ·  5호선 · 도보 8분',
+  ])
+  assert.ok(guides.every(i => i.kind === 'text' && !i.footer && i.y < 1140))
+  assert.equal(items.filter(i => i.id.startsWith('transit-stop-')).length, 2)
+  const generic = transitItems({...geo.place, id:'node/1', radius:50})
+  assert.ok(generic.some(i => i.kind === 'text' && i.text.includes('시청역') && i.text.includes('지도 밖')))
+  assert.ok(generic.every(i => i.kind === 'text' && !i.text.includes('도보')))
+  assert.deepEqual(transitItems({...geo.place, id:'node/1', lat:33, lon:125}), [])
+})

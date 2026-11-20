@@ -43,3 +43,9 @@ python3 data/prepare_dasan74.py original.json dasan74.updated.json --fetched-at 
 공개 Pages에서 ‘중구 세종대로 110’을 전국 범위의 Overpass 쿼리로 검색했을 때 시간 초과가 발생했다. 한국 Geofabrik 추출본에서 도로명·건물번호가 유효한 OSM 객체 494,144건을 선별했다. 같은 주소에 여러 OSM 객체가 있을 수 있다. 이 수는 고유 주소 수나 한국 주소 전체에 대한 지원율이 아니다. 후보 선택 시 현재 객체 ID와 도로명·건물번호를 다시 확인하고 주변 도로 조회까지 성공해야 갱신 시각을 기록한다.
 
 색인 원천은 2026-11-18 21:21:02 UTC의 OSM 데이터다. 약 10 MB의 압축 자료를 256개로 나눴으며 브라우저는 도로명에 해당하는 조각만 읽는다. 공개 시설의 이름, 행정구역, 좌표, OSM ID를 후보 구분에 사용한다. 데이터 기록 시각이 최근 방문이나 편집으로 바뀌지 않는다. 같은 원천으로 `python scripts/prepare-address-index.py south-korea-latest.osm.pbf public/address-index`를 실행하면 색인을 재생성할 수 있다. pyosmium 4.3.2를 사용한다. [원천과 해시](../public/address-index/source.json) · [Geofabrik 한국 추출본](https://download.geofabrik.de/asia/south-korea.html) · [OSM 이용조건](https://www.openstreetmap.org/copyright)
+
+## 약도에 표시하는 역
+
+전국 OSM 추출본(2026-11-18 UTC)에서 이름이 있는 여객 철도역·간이역 노드 1,336개를 추출했다. 같은 추출본에 `python3 scripts/prepare-stations.py south-korea-latest.osm.pbf src/stations.json`을 적용해 재생성할 수 있다. 일반 약도는 목적지 대표점에서 직선 1 km 안의 서로 다른 역을 최대 두 곳 안내한다. 지도 안의 역은 좌표에 문자 표식을 찍고, 지도 밖의 역은 방향을 적는다. [원천 자료와 ODbL](https://download.geofabrik.de/asia/south-korea.html)
+
+한국프레스센터는 행사장이 안내하는 시청역 4번 출구(1·2호선, 도보 3분)와 광화문역 5번 출구(5호선, 도보 8분)를 사용한다. 출구 좌표는 위 추출본에서 각 역의 정류장 구역 관계(8059934, 5672805)에 속한 번호 표기 노드로 확인했다. [행사장 교통 안내](https://www.koreapresscenter.com/) · [시청역 4번 출구](https://www.openstreetmap.org/node/3404904656) · [광화문역 5번 출구](https://www.openstreetmap.org/node/3403193751)

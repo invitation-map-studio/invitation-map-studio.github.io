@@ -7,6 +7,24 @@
     "site": "way/233593617",
     "sample": "press-center",
     "latitude": 37.5663,
-    "longitude": 126.9779
+    "longitude": 126.9779,
+    "transit": [
+      {
+        "name": "시청역 4번 출구",
+        "line": "1·2호선",
+        "minutes": 3,
+        "node": 3404904656,
+        "lon": 126.9773672,
+        "lat": 37.5668639
+      },
+      {
+        "name": "광화문역 5번 출구",
+        "line": "5호선",
+        "minutes": 8,
+        "node": 3403193751,
+        "lon": 126.9774219,
+        "lat": 37.5698233
+      }
+    ]
   }
 ]
