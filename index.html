@@ -117,6 +117,7 @@
             </div>
             <details>
               <summary>위치 대조 기록</summary>
+              <p><a id="review-map" target="_blank" rel="noopener noreferrer">이 주소를 네이버 지도에서 열기</a></p>
               <label for="review-note">대조 방법과 관찰 내용</label
               ><textarea id="review-note" maxlength="500" rows="3"></textarea
               ><label for="review-source">직접 대조한 네이버 지도 URL</label
@@ -140,7 +141,7 @@
             <label class="check"><input type="checkbox" id="maponly" /> 지도만</label>
           </div>
           <div class="paper" id="paper"></div>
-          <div class="details" id="meta"></div>
+          <div class="details"><span id="meta"></span> <a id="osm-credit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" hidden>지도 데이터 © OpenStreetMap</a></div>
           <p class="status" id="status" role="status" aria-live="polite"></p>
           <div class="row">
             <button id="download" class="primary">인쇄 파일 만들기</button

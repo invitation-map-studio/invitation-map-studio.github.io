@@ -199,12 +199,15 @@ function paint() {
     type,
     review,
     '자료 조회 ' + date(current.lastSuccessfulFetchAt) + ' (한국시간)',
-    current.origin === 'osm' ? '© OpenStreetMap contributors · ODbL' : '다산20 기준 자료',
+    current.origin === 'reference' ? '다산20 기준 자료' : '',
     current.imported ? '가져온 보관본 · 최신성 미확인' : '',
     current.refreshFailed ? '이전 조회본 · 갱신 실패' : '',
   ]
     .filter(Boolean)
     .join('  /  ')
+  el('osm-credit').hidden = current.origin !== 'osm'
+  el<HTMLAnchorElement>('review-map').href =
+    'https://map.naver.com/p/search/' + encodeURIComponent(current.address)
   const entries = editable()
   sel('element').replaceChildren(
     ...entries.map(
@@ -595,7 +598,10 @@ hook('download', async (signal) => {
     '전체 140 × 144 mm, 지도만 140 × 114 mm. PNG 600 dpi, 인쇄용 벡터 PDF 1쪽.',
     '편집용 SVG 글꼴: Noto Serif CJK KR / Noto Sans CJK KR. 글꼴이 없는 기기에서는 윤곽선 SVG를 사용하세요.',
     el('meta').textContent,
-  ].join('\n')
+    current.origin === 'osm'
+      ? '약도 그림을 청첩장에 배치할 때 지도 출처를 함께 표시하세요. 인쇄물은 약도 옆이나 출처란에 “지도 데이터 © OpenStreetMap contributors · openstreetmap.org/copyright”를 넣고, 웹에서는 “지도 데이터 © OpenStreetMap”에 https://www.openstreetmap.org/copyright 링크를 연결하세요.'
+      : '',
+  ].filter(Boolean).join('\n')
   const verification = [
     current.origin === 'osm'
       ? 'OpenStreetMap contributors · ODbL 1.0 · https://www.openstreetmap.org/copyright'

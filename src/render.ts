@@ -70,16 +70,9 @@ export function render(project: Project, mapOnly = false, interactive = false) {
     root.append(el)
   }
   if (project.origin === 'osm') {
-    const el = svg('text', {
-      x: 700,
-      y: 1125,
-      'text-anchor': 'middle',
-      'font-size': 17,
-      'font-family': 'Noto Sans CJK KR',
-      fill: '#504949',
-    })
-    el.textContent = '© OpenStreetMap contributors · https://www.openstreetmap.org/copyright'
-    root.append(el)
+    const source = svg('desc')
+    source.textContent = 'Map data © OpenStreetMap contributors · https://www.openstreetmap.org/copyright'
+    root.prepend(source)
   }
   return root
 }

@@ -181,7 +181,12 @@ try {
     const {files, zip, hashes} = await exportMap({fullSvg:serialize(project), mapOnlySvg:serialize(project,true),
       basename:'Dasan74_Wedding', readme, verification})
     for (const name of ['Dasan74_Wedding_Map.svg','Dasan74_Wedding_MapOnly.svg','Dasan74_Wedding_Map_Editable.svg']) {
-      if (!(await files.get(name).text()).includes('OpenStreetMap contributors')) throw Error('출처 누락')
+      const svg = new DOMParser().parseFromString(await files.get(name).text(), 'image/svg+xml')
+      if (!svg.querySelector('desc')?.textContent.includes('OpenStreetMap contributors'))
+        throw Error('SVG 출처 설명 누락')
+      if ([...svg.querySelectorAll('text, path[aria-label]')].some(el =>
+        (el.textContent + (el.getAttribute('aria-label') ?? '')).includes('OpenStreetMap')))
+        throw Error('약도에 출처 문구가 인쇄됨')
     }
     const b64 = await new Promise(resolve => {
       const reader = new FileReader()

@@ -20,7 +20,7 @@
 2. 검증 자료 1건 확보를 위해 OSM 본서버의 명시한 한 개의 bbox 자료를 수동 요청했다. 2026-11-20 09:33:18 KST에 완전한 JSON 3,408요소를 받았다. 개발용 CLI에서 실행했다. 공개 Pages의 CORS 성공 기록은 별도로 필요하다. OSM 편집 API는 상시 읽기 서비스의 백엔드로 쓰기에 부적합하므로 앱과 반복 평가에서 이 경로를 사용하지 않는다. [OSM API 사용 정책](https://operations.osmfoundation.org/policies/api/)
 3. 원 응답 SHA-256은 `402871af5e50e6c62c825087e5db1adbb1642220ba8b20b2c1fe21b5d0396b1d`다. 변환본에는 객체 ID, 버전, 시각, 표시에 필요한 태그, 노드 참조와 좌표를 남겼다. 사용자명·사용자 ID와 변경집합은 제외했다.
 
-저장본은 [다산74 JSON](../data/dasan74.json)에 있다. `source`는 원천과 권한, `evidence`는 주소 대조와 검수 상태, `elements`는 OSM 객체, `geo`는 브라우저 입력이다. `geo`의 점은 [경도, 위도] 순서다. 이 OSM 파생 데이터의 라이선스는 ODbL 1.0이다. 각 출력의 지도 본문에도 “© OpenStreetMap contributors”와 저작권 페이지 주소가 들어가야 한다. [OSM 저작권](https://www.openstreetmap.org/copyright) · [ODbL 전문](https://opendatacommons.org/licenses/odbl/1-0/)
+저장본은 [다산74 JSON](../data/dasan74.json)에 있다. `source`는 원천과 권한, `evidence`는 주소 대조와 검수 상태, `elements`는 OSM 객체, `geo`는 브라우저 입력이다. `geo`의 점은 [경도, 위도] 순서다. 이 OSM 파생 데이터의 라이선스는 ODbL 1.0이다. 작업실은 미리보기 옆에 출처 링크를 표시한다. 청첩장 편집용 그림에는 출처 문구를 인쇄하지 않는다. 배포하는 청첩장에는 약도 옆이나 출처란에 표기를 배치할 수 있도록 ZIP 사용 안내에 문구와 주소를 제공한다. [OSM 저작권](https://www.openstreetmap.org/copyright) · [ODbL 전문](https://opendatacommons.org/licenses/odbl/1-0/)
 
 같은 파일을 재생성할 때는 원 응답과 실제 수신시각을 사용한다. 새 원본으로 갱신할 때에는 별도 파일을 만들고 원본 변경과 입구 확인 상태를 비교한다.
 
