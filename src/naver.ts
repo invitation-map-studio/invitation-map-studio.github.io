@@ -40,7 +40,7 @@ const authError = () =>
 let sdkLoad: Promise<NaverMaps> | undefined
 let loadedKey = ''
 let view:
-  | { container: HTMLElement; controller: AbortController; disposeMap?: () => void }
+  | { container: HTMLElement; requestId: string; controller: AbortController; disposeMap?: () => void }
   | undefined
 
 function loadSdk(key: string): Promise<NaverMaps> {
@@ -141,9 +141,11 @@ export async function showNaver(
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(key)) throw new Error('네이버 지도 공개 키 설정이 필요합니다.')
   if (!query || query.length > 200)
     throw new Error('실시간으로 확인할 주소를 200자 이내로 입력해 주세요.')
+  const requestId = JSON.stringify([key, query, markerPoint])
+  if (view?.container === container && view.requestId === requestId) return
   if (view) closeNaver(view.container)
   const controller = new AbortController()
-  const current: NonNullable<typeof view> = { container, controller }
+  const current: NonNullable<typeof view> = { container, controller, requestId }
   view = current
   const close = document.createElement('button')
   close.type = 'button'
