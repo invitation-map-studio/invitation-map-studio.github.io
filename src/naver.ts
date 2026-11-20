@@ -2,6 +2,7 @@ import { setProgress } from './progress'
 import { compareNaverAddress } from './location-check'
 import type { Point } from './model'
 import { nearbyStations } from './transit'
+type RoadReference = (address: string, point: Point) => void
 interface AddressResult {
   roadAddress?: string
   jibunAddress?: string
@@ -42,7 +43,7 @@ const authError = () =>
 let sdkLoad: Promise<NaverMaps> | undefined
 let loadedKey = ''
 let view:
-  | { container: HTMLElement; requestId: string; markerPoint?: Point; updateInfo?: () => void; controller: AbortController; disposeMap?: () => void }
+  | { container: HTMLElement; requestId: string; markerPoint?: Point; onRoad?: RoadReference; reportRoad?: () => void; updateInfo?: () => void; controller: AbortController; disposeMap?: () => void }
   | undefined
 
 function loadSdk(key: string): Promise<NaverMaps> {
@@ -146,6 +147,7 @@ export async function showNaver(
   publicKey: string,
   markerPoint?: Point,
   pickForPrint?: AbortSignal,
+  onRoad?: RoadReference,
 ): Promise<{ address: string; point: Point } | undefined> {
   const key = publicKey.trim()
   const query = address.trim()
@@ -154,12 +156,14 @@ export async function showNaver(
     throw new Error('실시간으로 확인할 주소를 200자 이내로 입력해 주세요.')
   const requestId = JSON.stringify([key, query])
   if (view?.container === container && view.requestId === requestId && !pickForPrint) {
+    view.onRoad = onRoad
     updateNaverMarker(container, markerPoint)
+    view.reportRoad?.()
     return
   }
   if (view) closeNaver(view.container)
   const controller = new AbortController()
-  const current: NonNullable<typeof view> = { container, controller, requestId, markerPoint }
+  const current: NonNullable<typeof view> = { container, controller, requestId, markerPoint, onRoad }
   view = current
   const cancel = () => closeNaver(container)
   pickForPrint?.throwIfAborted()
@@ -210,6 +214,8 @@ export async function showNaver(
         info.textContent = stop ? comparison + ' · 가까운 지하철 ' + stop.name + ' (OpenStreetMap)' : comparison
       }
       current.updateInfo()
+      current.reportRoad = () => current.onRoad?.(item.roadAddress || '', coords)
+      current.reportRoad()
       return { point: coords, address: item.roadAddress || '' }
     }
     for (const item of matches) {

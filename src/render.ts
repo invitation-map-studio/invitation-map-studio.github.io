@@ -11,8 +11,9 @@ function draw(item: Item, ink: string) {
     return svg('path', {
       d: item.points.map(([x, y], i) => (i ? 'L' : 'M') + x + ' ' + y).join(' '),
       fill: 'none',
-      stroke: fill,
+      stroke: item.id.startsWith('local-') ? '#918989' : fill,
       'stroke-width': item.width,
+      ...(/^local-(?:addr-)?foot-/.test(item.id) ? { 'stroke-dasharray': '5 4' } : {}),
     })
   if (item.kind === 'text') {
     const el = svg('text', {

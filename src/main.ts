@@ -12,11 +12,12 @@ import {
   placeKey,
   type Geography,
   type Item,
+  type Point,
   type Place,
   type Project,
   type Spec,
 } from './model'
-import { addresses, buildingItems, exitLabels, fetchGeography, layout } from './geography'
+import { addresses, buildingItems, exitLabels, fetchGeography, layout, selectLocalRoads, localRoadItems } from './geography'
 import { canonicalAddress, parseRoadAddress, mentionsVenue } from './road-address'
 import { render, serialize } from './render'
 import {
@@ -38,6 +39,7 @@ import { stationRadius, transitItems } from './transit'
 import { buildingsNear } from './buildings'
 import { commercialAddresses } from './address-index'
 import { buildingsAtReference } from './footprints'
+import { localRoadsNear, type LocalRoad } from './local-roads'
 import { indexedRoads } from './major-roads'
 import { closeNaver, showNaver, updateNaverMarker } from './naver'
 import { localLocationCheck, markerPoint } from './location-check'
@@ -152,6 +154,7 @@ function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 's
         origin === 'review' ? 'review-status' : undefined,
       )
     } finally {
+      await applyRoadCheck()
       setProgress('work')
       busy = null
       reviewButton.disabled = false
@@ -346,6 +349,57 @@ async function library() {
     area.append(b)
   }
 }
+type RoadLayer = { id: string; roads: LocalRoad[]; street: string }
+let roadLayer: RoadLayer | undefined
+let checkedRoads: { layer: RoadLayer; selected: LocalRoad[] } | undefined
+
+function addLocalRoads(p: Project, selected: LocalRoad[], street: string) {
+  if (!p.geo) return false
+  const additions = localRoadItems(p.spec, p.geo.place, selected, street)
+  if (!additions.length) return false
+  p.spec.items.unshift(...additions)
+  p.review = pending()
+  return true
+}
+
+async function applyRoadCheck() {
+  const check = checkedRoads
+  checkedRoads = undefined
+  if (!check || check.layer !== roadLayer || current.id !== check.layer.id) return false
+  const changed = addLocalRoads(current, check.selected, check.layer.street)
+  const street = check.layer.street
+  if (changed) {
+    const hadDownloads = urls.length > 0
+    paint()
+    if (hadDownloads) status('네이버 대조 후 세부 도로가 추가됐습니다. 인쇄 파일 만들기로 최신 약도를 받을 수 있습니다.', false, 'status')
+    try { await save(current) }
+    catch { status('세부 도로를 화면에 반영했습니다. 기기 저장에 실패했습니다.', true, 'status') }
+  }
+  if (roadLayer !== check.layer) return changed
+  const local = current.spec.items.some(i => !i.hidden && i.kind === 'line' && i.id.startsWith('local-addr-'))
+  const major = new Set(current.geo!.roads.filter(r => r.name === street).map(r => String(r.id)))
+  const shown = local || current.spec.items.some(i => !i.hidden && i.kind === 'line' &&
+    major.has(/^road-(\d+)-/.exec(i.id)?.[1] ?? ''))
+  el('road-check').textContent = '네이버 주소 대조 · ' + street + (shown ? ' 표시 확인' : '의 공개 도로 선형을 확인하지 못했습니다.') +
+    (changed ? ' · 주변 골목·보행로 보강' : '')
+  return changed
+}
+
+function compareAccessRoads(layer: RoadLayer, address: string, point: Point) {
+  if (roadLayer !== layer || current.id !== layer.id || !current.geo) return
+  let civic = ''
+  try { civic = canonicalAddress(parseRoadAddress(address).address) } catch { /* no road address */ }
+  const target = canonicalAddress(current.address)
+  const place = current.geo.place
+  const meters = Math.hypot((point[0] - place.lon) * Math.cos(place.lat * Math.PI / 180), point[1] - place.lat) * 111320
+  if (!(civic === target || civic.endsWith(' ' + target)) || meters > Math.min(200, place.radius)) {
+    el('road-check').textContent = '네이버 주소 또는 대표점이 달라 세부 도로 대조를 보류했습니다.'
+    return
+  }
+  checkedRoads = {layer, selected: selectLocalRoads(current.spec, place, layer.roads, layer.street, point)}
+  if (!busy) void applyRoadCheck()
+}
+
 async function use(p: Project, message: string, previous?: Project | null) {
   setProgress('work', '약도 불러오는 중')
   if (p.geo && !p.imported) {
@@ -375,8 +429,26 @@ async function use(p: Project, message: string, previous?: Project | null) {
       p.spec.items.push(...prior.spec.items.filter(i => i.id.startsWith('building-')))
     }
   }
+  let nextLayer: RoadLayer | undefined
+  let messageRoad = ''
+  if (p.geo && !p.imported && p.spec.layout === 'minimal') {
+    const signal = AbortSignal.timeout(7500)
+    try {
+      const roads = await localRoadsNear(p.geo.place, busy ? AbortSignal.any([busy.signal, signal]) : signal)
+      const street = parseRoadAddress(p.address).street
+      nextLayer = {id: p.id, roads, street}
+      addLocalRoads(p, selectLocalRoads(p.spec, p.geo.place, roads, street), street)
+    } catch {
+      messageRoad = '골목·보행로 자료를 읽지 못했습니다. 약도를 다시 열면 재시도합니다.'
+    }
+  }
   busy?.signal.throwIfAborted()
+  if (p.geo && !p.geo.roads.length && !p.spec.items.some(i => i.kind === 'line' && i.id.startsWith('local-')))
+    throw Error('이 주소 주변에서 인쇄할 도로 선형을 찾지 못했습니다.')
   endFallback(p.address)
+  roadLayer = nextLayer
+  checkedRoads = undefined
+  el('road-check').textContent = messageRoad
   current = p
   current.lastAccessedAt = iso()
   history = []
@@ -604,9 +676,16 @@ async function makeAddress(place: Place, name: string, signal: AbortSignal, deta
   } catch (error) {
     if (signal.aborted) throw error
   }
-  const geo = seed?.geo ?? fallback
-  if (geo) await seedGeography(geo, seed?.fetchedAt ?? fetchedAt)
+  let geo = seed?.geo ?? fallback
   const frame = geo?.place ?? { ...place, radius: stationRadius(place) }
+  if (!geo && !(await savedGeography(frame))) {
+    const roads = await localRoadsNear(frame, signal)
+    const area: Geography = { source: 'osm', place: frame, roads: [], landmarks: [] }
+    const drawing = layout(area, name)
+    const street = parseRoadAddress(frame.address).street
+    if (localRoadItems(drawing, frame, selectLocalRoads(drawing, frame, roads, street), street).length) geo = area
+  }
+  if (geo) await seedGeography(geo, seed?.fetchedAt ?? fetchedAt)
   await make(frame, name, false, signal, details)
 }
 
@@ -789,7 +868,8 @@ hook('erase', async () => {
     location.reload()
   }
 })
-hook('download', async (signal) => {
+async function downloadPrintFiles(signal: AbortSignal): Promise<void> {
+  await applyRoadCheck()
   clearFiles()
   const target = el('downloads')
   target.className = 'downloads'
@@ -797,6 +877,7 @@ hook('download', async (signal) => {
     existing = await readArchive(key)
   signal.throwIfAborted()
   if (existing) {
+    if (await applyRoadCheck()) return downloadPrintFiles(signal)
     link(existing.zip, existing.name, target, '보관 ZIP 다운로드').click()
     status('파일 무결성을 확인하고 기존 ZIP을 불러왔습니다.')
     return
@@ -809,6 +890,8 @@ hook('download', async (signal) => {
     '전체 140 × 144 mm, 지도만 140 × 114 mm. PNG 600 dpi, 인쇄용 벡터 PDF 1쪽.',
     '편집용 SVG 글꼴: Noto Serif CJK KR / Noto Sans CJK KR. 글꼴이 없는 기기에서는 윤곽선 SVG를 사용하세요.',
     el('meta').textContent,
+    current.spec.items.some(i => i.kind === 'line' && i.id.startsWith('local-'))
+      ? '가는 실선은 골목·작은 도로, 점선은 공개 자료의 보행로입니다. 보행 경로 안내와 실제 출입구는 별도 확인이 필요합니다.' : '',
     current.origin === 'osm'
       ? '약도 그림을 청첩장에 배치할 때 지도 출처를 함께 표시하세요. 인쇄물은 약도 옆이나 출처란에 “지도 데이터 © OpenStreetMap contributors · openstreetmap.org/copyright”를 넣고, 웹에서는 “지도 데이터 © OpenStreetMap”에 https://www.openstreetmap.org/copyright 링크를 연결하세요.'
       : '',
@@ -846,6 +929,7 @@ hook('download', async (signal) => {
       status(`인쇄 파일 생성 중 · ${done}/${total}`)
     } },
   )
+  if (await applyRoadCheck()) return downloadPrintFiles(signal)
   link(result.zip, result.zipName, target, '전체 ZIP 다운로드')
   for (const [name, blob] of result.files)
     link(blob, name, target, name.slice(name.indexOf('_') + 1))
@@ -857,10 +941,15 @@ hook('download', async (signal) => {
   } catch {
     status('파일을 생성했습니다. 기기 저장 공간이 부족하면 지금 ZIP을 다운로드해 주세요.', true)
   }
-}, '인쇄 파일 준비 중')
+  if (await applyRoadCheck()) return downloadPrintFiles(signal)
+}
+hook('download', downloadPrintFiles, '인쇄 파일 준비 중')
 hook('print-preview', async (signal) => {
   const { exportPreview } = await import('./export')
-  const blob = await exportPreview(serialize(current), signal)
+  let blob: Blob
+  do {
+    blob = await exportPreview(serialize(current), signal)
+  } while (await applyRoadCheck())
   clearFiles()
   const a = link(blob, 'WeddingMap_Preview.png', el('downloads'), '150 dpi 미리보기 저장')
   const img = new Image()
@@ -876,7 +965,9 @@ el('naver-notice').hidden = !naverKey
 async function displayNaver(address: string, point?: ReturnType<typeof markerPoint>) {
   const container = el('naver-map')
   try {
-    await showNaver(container, address, naverKey, point)
+    const layer = roadLayer
+    await showNaver(container, address, naverKey, point, undefined,
+      layer ? (road, coords) => compareAccessRoads(layer, road, coords) : undefined)
   } catch (error) {
     if (naverSubject === address) container.textContent = error instanceof Error ? error.message : '네이버 위치 대조에 실패했습니다.'
   }

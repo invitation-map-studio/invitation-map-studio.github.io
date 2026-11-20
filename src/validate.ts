@@ -1,4 +1,4 @@
-import { coordinate, iso, pending, type Project } from './model'
+import { coordinate, iso, pending, type Item, type Project } from './model'
 const bad = () => {
   throw Error('지원하지 않는 프로젝트 형식이거나 값의 허용 범위를 벗어났습니다.')
 }
@@ -108,7 +108,8 @@ export function importProject(raw: string): Project {
       !coordinate(a.lat, a.lon) ||
       !num(a.radius, 50, 2000) ||
       !Array.isArray(g.roads) ||
-      !g.roads.length ||
+      (!g.roads.length && !(spec.layout === 'minimal' &&
+        spec.items.some((i: Item) => i.kind === 'line' && /^local-(?:addr-)?(?:foot|lane)-\d+-\d+$/.test(i.id)))) ||
       !Array.isArray(g.landmarks) ||
       g.roads.length + g.landmarks.length > 20000
     )

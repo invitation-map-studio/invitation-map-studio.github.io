@@ -1,3 +1,4 @@
+import type { LocalRoad } from './local-roads'
 import type { Building } from './buildings'
 import { mapBounds, stationsFor, transitItems } from './transit'
 import { indexedAddresses } from './address-index'
@@ -481,6 +482,103 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
     if (marked.length === 5) break
   }
   return result
+}
+
+// Trim only the ink under an existing caption or marker, preserving hand-edited placement.
+function clearSegments(a: Point, b: Point, occupied: Rect[]): Point[][] {
+  const visible = clip(a, b)
+  if (!visible.length) return []
+  const [start, end] = visible, length = distance(start, end)
+  if (length < .1) return []
+  const bounds = envelope(visible)
+  const gaps = occupied.filter(rect => overlap(bounds, rect)).map(rect => clip(start, end, rect))
+    .filter(pair => pair.length).map(([from,to]) => [distance(start,from)/length, distance(start,to)/length])
+    .sort((u,v) => u[0]-v[0])
+  const at = (t: number): Point => [start[0] + (end[0]-start[0])*t, start[1] + (end[1]-start[1])*t]
+  const parts: Point[][] = []
+  let cursor = 0
+  for (const [lo, hi] of gaps) {
+    if (lo > cursor + .001) parts.push([at(cursor), at(lo)])
+    cursor = Math.max(cursor, hi)
+  }
+  if (cursor < .999) parts.push([at(cursor), end])
+  return parts
+}
+
+export function selectLocalRoads(spec: Spec, place: Place, roads: LocalRoad[], street: string,
+  reference?: Point): LocalRoad[] {
+  const scale = 440 / place.radius
+  const axes = mapScale(place)
+  const anchors: Point[] = reference
+    ? [[axes.cx + (reference[0] - place.lon) * axes.x, axes.cy - (reference[1] - place.lat) * axes.y]]
+    : [[axes.cx, axes.cy]]
+  if (!inside(anchors[0])) return []
+  if (!reference) {
+    const stop = spec.items.find(i => i.id === 'transit-stop-A' && i.kind === 'dot' && !i.hidden)
+    if (stop?.kind === 'dot') anchors.push([stop.x, stop.y])
+  }
+  const selected = new Map<number, LocalRoad>()
+  for (const anchor of anchors) {
+    const ranked = roads.map(road => {
+      let nearest = Infinity
+      for (let i = 1; i < road.points.length; i++) nearest = Math.min(nearest,
+        distanceToLine(anchor, road.points[i - 1], road.points[i]))
+      return {road, meters: nearest / scale}
+    }).sort((a,b) => a.meters - b.meters || a.road.id - b.road.id)
+    const take = (entries: typeof ranked, limit: number) => {
+      for (const {road} of entries.slice(0, limit)) selected.set(road.id, road)
+    }
+    take(ranked.filter(r => r.road.name === street && street && r.meters <= place.radius), 6)
+    take(ranked.filter(r => !r.road.foot && r.meters <= 170), 5)
+    take(ranked.filter(r => r.road.foot && r.meters <= 130), 5)
+  }
+  return [...selected.values()]
+}
+
+export function localRoadItems(spec: Spec, place: Place, roads: LocalRoad[], street: string): Item[] {
+  const scale = 440 / place.radius
+  const drawn = new Set(spec.items.map(i =>
+    /^(?:road-|local-(?:addr-)?(?:foot|lane)-)(\d+)-/.exec(i.id)?.[1]))
+  const { occupied, segments } = obstacles(spec.items)
+  const additions: Item[] = []
+  const named: Segment[] = []
+  for (const road of roads) {
+    if (drawn.has(String(road.id))) continue
+    const addr = street !== '' && road.name === street
+    const key = 'local-' + (addr ? 'addr-' : '') + (road.foot ? 'foot-' : 'lane-') + road.id + '-'
+    const points = simplify(road.points, [], new Set(), 2 * scale)
+    let run: Point[] = [], section = 0
+    for (let i = 1; i < points.length; i++) {
+      for (const [a,b] of clearSegments(points[i-1], points[i], occupied)) {
+        if (!run.length || distance(run[run.length-1], a) > .03) {
+          run = [a]
+          additions.push({ ...baseItem(key + section++, 'line'), kind: 'line',
+            width: addr ? 2.7 : road.foot ? 1.8 : 2.2, points: run })
+        }
+        run.push(b)
+        const segment = { a, b, length: distance(a,b), bounds: envelope([a,b]) }
+        segments.push(segment)
+        if (addr) named.push(segment)
+      }
+    }
+  }
+  if (named.length && !spec.items.some(i => i.kind === 'text' && (i.text === street || i.id === 'local-street-name'))) {
+    for (const seg of named.sort((a,b) => b.length-a.length)) {
+      let angle = Math.atan2(seg.b[1]-seg.a[1], seg.b[0]-seg.a[0]) * 180 / Math.PI
+      if (angle > 90) angle -= 180
+      if (angle < -90) angle += 180
+      const rad = angle * Math.PI/180
+      for (const fraction of [.5,.3,.7]) for (const offset of [-14,32,-29,45]) {
+        const x = seg.a[0] + (seg.b[0]-seg.a[0])*fraction - Math.sin(rad)*offset
+        const y = seg.a[1] + (seg.b[1]-seg.a[1])*fraction + Math.cos(rad)*offset
+        if (placement(street, 22, x, y, angle, segments, occupied)) {
+          additions.push(label('local-street-name', street, x, y, 22, {font:'sans', angle}))
+          return additions
+        }
+      }
+    }
+  }
+  return additions
 }
 
 const majorRoads = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
