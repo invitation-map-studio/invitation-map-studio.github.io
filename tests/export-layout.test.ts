@@ -48,7 +48,7 @@ test('다산74의 주요 도로와 목적지 이름을 읽을 수 있고 일반 
   const labels = items.filter(
     (i) => i.kind === 'text' && !i.footer && !['title', 'north'].includes(i.id),
   )
-  assert.ok(labels.some((i) => i.kind === 'text' && i.text === '미금로'))
+  assert.ok(labels.some((i) => i.kind === 'text' && i.id.startsWith('street-') && geo.roads.some(r => r.name === i.text)))
   assert.ok(labels.some((i) => i.kind === 'text' && i.text === fixture.name))
   assert.ok(!items.some(i => /^(label-|dot-)/.test(i.id)))
   assert.ok(items.some(i => i.id.startsWith('junction-')))
@@ -74,8 +74,8 @@ test('한국프레스센터 출구 두 곳을 지도와 지도 전용 인쇄 영
   const items = layout(geo, '한국프레스센터').items
   const guides = items.filter(i => i.kind === 'text' && i.id.startsWith('transit-guide-'))
   assert.deepEqual(guides.map(i => i.kind === 'text' && i.text), [
-    'A   시청역 4번 출구  ·  1·2호선 · 도보 3분',
-    'B   광화문역 5번 출구  ·  5호선 · 도보 8분',
+    '시청역 4번 출구  ·  1·2호선 · 도보 3분',
+    '광화문역 5번 출구  ·  5호선 · 도보 8분',
   ])
   assert.ok(guides.every(i => i.kind === 'text' && !i.footer && i.y < 1140))
   assert.equal(items.filter(i => i.id.startsWith('transit-stop-')).length, 2)
@@ -138,4 +138,23 @@ test('미등록 주소에서도 출구 소속 역·호선과 실제 출구 좌�
   const other = exits.find(row => row[1] === '청담' && row[2] === '3')!
   const changed = transitItems({ ...place, lon:Number(other[3]), lat:Number(other[4]) })
   assert.ok(changed.some(i => i.kind === 'text' && /청담역 3번 출구.*0m/.test(i.text)))
+})
+
+test('근거리 약도는 가까운 출구 이름을 도면에 남기고 먼 역 때문에 범위를 넓히지 않는다', async () => {
+  const { stationRadius } = await import('../src/transit')
+  const place = { id: 'node/1', address: '서울특별시 강남구 학동로 519',
+    lon: 127.0554556, lat: 37.5201877, radius: 1500, entrance: 'address' }
+  place.radius = stationRadius(place)
+  assert.equal(place.radius, 155)
+  const map = layout({ source: 'osm', place, roads: [], landmarks: [] }, '예식장')
+  assert.equal(map.style, 'vicinity')
+  assert.ok(map.items.some(i => i.id === 'transit-exit-A' && i.kind === 'text' && i.text === '청담역 12번 출구'))
+  assert.ok(!map.items.some(i => i.id === 'transit-guide-B'))
+
+  const suburban = { ...fixture.geo.place, radius: 1500 }
+  suburban.radius = stationRadius(suburban)
+  assert.ok(suburban.radius <= 260)
+  const suburbMap = layout({ ...fixture.geo, place: suburban }, fixture.name)
+  assert.ok(suburbMap.items.some(i => i.id === 'transit-guide-A' && i.kind === 'text' && /다산역.*직선 약.*지도 밖/.test(i.text)))
+  assert.ok(!suburbMap.items.some(i => i.id.startsWith('transit-stop-')))
 })

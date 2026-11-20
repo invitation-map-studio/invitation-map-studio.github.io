@@ -89,7 +89,7 @@ function createProject(geo: Geography | null, name: string, details = ''): Proje
   }
 }
 function sample74() {
-  const p = createProject(knownGeo, fixture.name)
+  const p = createProject({ ...knownGeo, place: { ...knownGeo.place, radius: stationRadius(knownGeo.place) } }, fixture.name)
   p.lastSuccessfulFetchAt = fixture.fetchedAt
   p.expiresAt = iso(Date.parse(fixture.fetchedAt) + DAY)
   return p
@@ -309,7 +309,7 @@ function paint() {
           i.kind === 'text'
             ? i.text || '빈 안내 문구'
             : i.kind === 'flower'
-              ? '꽃 목적지 표식'
+              ? '목적지 표식'
               : i.id.startsWith('transit-stop-') ? '역 표식 ' + i.id.slice(-1)
               : i.id.startsWith('building-mark-') ? (buildingNames.get(i.id) ?? '건물') + ' 표식'
               : i.id.startsWith('junction-') ? '교차로 표식' : '시설 점 ' + i.id,
@@ -408,7 +408,7 @@ async function use(p: Project, message: string, previous?: Project | null) {
     if (!guides.length || (!guides.some(i => i.id.startsWith('transit-exit-')) &&
         JSON.stringify(guides) === JSON.stringify(transitItems(p.geo.place, false)))) {
       p.spec.items = p.spec.items.filter(i => !i.id.startsWith('transit-'))
-      p.spec.items.push(...transitItems(p.geo.place))
+      p.spec.items.push(...transitItems(p.geo.place, true, p.spec.style === 'vicinity'))
       p.spec.items.push(...exitLabels(p.spec.items, p.geo.place))
     }
   }
@@ -488,7 +488,7 @@ function revised(old: Project, geo: Geography, name: string): Project {
 async function make(place: Place, name: string, force: boolean, signal: AbortSignal, details = '') {
   const footer = current.spec.items.find((item) => item.id === 'details')
   let old =
-    current.geo && (!searching || current.spec.layout === 'minimal') &&
+    current.geo && (!searching || current.spec.style === 'vicinity') &&
     placeKey(current.geo.place) === placeKey(place) &&
     current.name === name &&
     (!searching || (footer?.kind === 'text' && footer.text === details))
@@ -676,8 +676,8 @@ async function makeAddress(place: Place, name: string, signal: AbortSignal, deta
   } catch (error) {
     if (signal.aborted) throw error
   }
-  let geo = seed?.geo ?? fallback
-  const frame = geo?.place ?? { ...place, radius: stationRadius(place) }
+  const frame = seed?.geo.place ?? { ...place, radius: stationRadius(place) }
+  let geo = seed?.geo ?? (fallback && { ...fallback, place: frame })
   if (!geo && !(await savedGeography(frame))) {
     const roads = await localRoadsNear(frame, signal)
     const area: Geography = { source: 'osm', place: frame, roads: [], landmarks: [] }
@@ -741,7 +741,7 @@ hook('dasan20', () =>
   ),
 )
 hook('dasan74', () =>
-  use(sample74(), '공식 단지 주소와 OSM 경계를 대조한 보관본입니다. 꽃은 단지 중심을 표시합니다.'),
+  use(sample74(), '공식 단지 주소와 OSM 경계를 대조한 보관본입니다. 표식은 단지 중심을 가리킵니다.'),
 )
 sel('element').onchange = () => {
   selected = sel('element').value

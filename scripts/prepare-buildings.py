@@ -16,7 +16,8 @@ def priority(t):
     if amenity in ('hospital', 'library', 'theatre', 'arts_centre', 'university') or t.get('historic') == 'castle':
         return 1
     if (amenity in ('school', 'police', 'fire_station', 'post_office', 'community_centre')
-            or t.get('tourism') == 'hotel' or t.get('office') == 'government'):
+            or t.get('tourism') == 'hotel' or t.get('office') == 'government'
+            or t.get('leisure') == 'park' or shop == 'supermarket' or amenity == 'bank'):
         return 2
     if t.get('building') in ('public', 'civic', 'government', 'commercial', 'office', 'hotel', 'retail', 'hospital'):
         return 3

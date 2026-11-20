@@ -19,6 +19,7 @@ export type Item = { id: string; tone: Tone; footer: boolean; hidden: boolean } 
 )
 export interface Spec {
   layout?: 'minimal'
+  style?: 'vicinity'
   items: Item[]
   ink: string
 }

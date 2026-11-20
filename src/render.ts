@@ -5,7 +5,7 @@ function svg(tag: string, attrs: Record<string, string | number> = {}) {
   for (const [key, val] of Object.entries(attrs)) el.setAttribute(key, String(val))
   return el
 }
-function draw(item: Item, ink: string) {
+function draw(item: Item, ink: string, vicinity: boolean) {
   const fill = { ink, soft: '#686163', line: '#b9b1ad' }[item.tone]
   if (item.kind === 'line')
     return svg('path', {
@@ -31,6 +31,8 @@ function draw(item: Item, ink: string) {
     return el
   }
   if (item.kind === 'dot' && item.id.startsWith('transit-stop-')) {
+    if (vicinity) return svg('circle', {cx: item.x, cy: item.y, r: item.radius,
+      fill: '#fff', stroke: ink, 'stroke-width': 2.8})
     const g = svg('g', {transform: `translate(${item.x} ${item.y})`})
     g.append(svg('circle', {r: item.radius, fill: ink, stroke: '#fff', 'stroke-width': 3}))
     const letter = svg('text', {x: 0, y: 7, 'text-anchor': 'middle', 'font-size': 20,
@@ -47,6 +49,12 @@ function draw(item: Item, ink: string) {
     transform: `translate(${item.x} ${item.y}) scale(${item.radius / 28})`,
     fill,
   })
+  if (vicinity && item.id === 'destination') {
+    // Anchor the tip at the measured venue point in the editor and all exports.
+    g.append(svg('path', {d: 'M0 0 C-5 -8 -20 -24 -20 -37 A20 20 0 1 1 20 -37 C20 -24 5 -8 0 0 Z'}))
+    g.append(svg('circle', {cx: 0, cy: -37, r: 10, fill: '#fff'}))
+    return g
+  }
   for (let angle = 0; angle < 360; angle += 60)
     g.append(svg('ellipse', { cx: 0, cy: -14.25, rx: 5, ry: 13.75, transform: `rotate(${angle})` }))
   g.append(svg('circle', { r: 6 }))
@@ -77,7 +85,7 @@ export function render(project: Project, mapOnly = false, interactive = false) {
                 : '확인 필요 시안 · 출입구 미확인',
           }
         : item,
-      project.spec.ink,
+      project.spec.ink, project.spec.style === 'vicinity',
     )
     if (interactive) el.setAttribute('data-item', item.id)
     root.append(el)

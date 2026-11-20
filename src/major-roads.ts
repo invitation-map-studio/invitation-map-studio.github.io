@@ -27,10 +27,9 @@ export async function indexedRoads(place: Place, signal: AbortSignal) {
   const index: Index = await (await read('index.json', signal)).json()
   const metersX = 111320 * Math.cos(place.lat * Math.PI / 180)
   const radius = stationRadius(place)
-  const limit = Math.max(1500, radius)
   const available = new Set(index.tiles)
   const tiles: string[] = []
-  const lonDelta = limit * 1.43 / metersX, latDelta = limit * 1.02 / 111320
+  const lonDelta = radius * 1.43 / metersX, latDelta = radius * 1.02 / 111320
   for (let x = Math.floor((place.lon - lonDelta) * 8); x <= Math.floor((place.lon + lonDelta) * 8); x++)
     for (let y = Math.floor((place.lat - latDelta) * 8); y <= Math.floor((place.lat + latDelta) * 8); y++)
       if (available.has(x + '-' + y)) tiles.push(x + '-' + y)
@@ -38,24 +37,19 @@ export async function indexedRoads(place: Place, signal: AbortSignal) {
     const bytes = await (await read(key + '.bin', signal)).arrayBuffer()
     return JSON.parse(strFromU8(gunzipSync(new Uint8Array(bytes)))) as Row[]
   }))
-  const rows = new Map<number, { road: Road; radius: number }>()
-  // Enlarge sparse maps until at least one major road fits. Dense areas keep the
-  // closer scale. Preserve original node IDs and coordinates for true junctions.
-  const radii = [...new Set([radius, Math.max(radius, 700), Math.max(radius, 1000), limit])]
+  const rows = new Map<number, Road>()
   for (const chunk of chunks) for (const [id, version, name, highway, level, nodes] of chunk) {
     if (rows.has(id)) continue
     const offsets = nodes.map(([, x, y]) => [(x / 1e7 - place.lon) * metersX, (y / 1e7 - place.lat) * 111320])
-    const fits = radii.find(r => offsets.some(([x, y], i) => i > 0 && crosses(
-      offsets[i - 1][0], offsets[i - 1][1], x - offsets[i - 1][0], y - offsets[i - 1][1], r * 1.4, r,
-    )))
-    if (fits === undefined) continue
-    rows.set(id, { radius: fits, road: { id, version, name, highway, level,
-      nodes: nodes.map(n => n[0]), points: nodes.map(([, x, y]) => [x / 1e7, y / 1e7]) } })
+    const fits = offsets.some(([x, y], i) => i > 0 && crosses(
+      offsets[i - 1][0], offsets[i - 1][1], x - offsets[i - 1][0], y - offsets[i - 1][1], radius * 1.42, radius * 1.02,
+    ))
+    if (!fits) continue
+    rows.set(id, { id, version, name, highway, level,
+      nodes: nodes.map(n => n[0]), points: nodes.map(([, x, y]) => [x / 1e7, y / 1e7]) })
   }
-  const found = [...rows.values()]
-  if (!found.length) return
-  const frame = Math.min(...found.map(r => r.radius))
-  const geo: Geography = { source: 'osm', place: { ...place, radius: frame }, landmarks: [],
-    roads: found.filter(r => r.radius <= frame).map(r => r.road).sort((a, b) => a.id - b.id) }
+  if (!rows.size) return
+  const geo: Geography = { source: 'osm', place: { ...place, radius }, landmarks: [],
+    roads: [...rows.values()].sort((a, b) => a.id - b.id) }
   return { geo, fetchedAt: index.sourceTime }
 }

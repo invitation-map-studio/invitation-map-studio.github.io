@@ -40,8 +40,8 @@ export function localLocationCheck(project: Project) {
   if (marker) {
     const offset = distanceMeters(marker, [place.lon, place.lat])
     const source = place.entrance === 'commercial-address' ? '상가 주소' : 'OSM'
-    parts.push(offset < 1 ? `꽃 표식이 ${source} 대표점과 일치` : `꽃 표식이 ${source} 대표점에서 ${Math.round(offset)}m 이동됨`)
-  } else parts.push('꽃 표식 확인 필요')
+    parts.push(offset < 1 ? `목적지 표식이 ${source} 대표점과 일치` : `목적지 표식이 ${source} 대표점에서 ${Math.round(offset)}m 이동됨`)
+  } else parts.push('목적지 표식 확인 필요')
   const official = venues.find(r => r.site === record?.site)
   if (official && marker) {
     const distance = distanceMeters(marker, [official.longitude, official.latitude])
@@ -58,7 +58,7 @@ export function compareNaverAddress(address: string, result: string, point: Poin
   }
   const a = civic(address), b = civic(result)
   const distance = distanceMeters(point, marker)
-  const distanceNote = `네이버 주소 대표점과 꽃 표식 사이 약 ${Math.round(distance)}m`
+  const distanceNote = `네이버 주소 대표점과 목적지 표식 사이 약 ${Math.round(distance)}m`
   if (!a || !b || !(a === b || b.endsWith(' ' + a)))
     return '도로명주소 일치 여부 확인 필요 · ' + distanceNote
   return '도로명주소 일치 · ' + distanceNote +

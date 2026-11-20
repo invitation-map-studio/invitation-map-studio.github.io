@@ -13,7 +13,7 @@ export function nearbyStations(place: Pick<Place, 'lon' | 'lat'>, numbered: bool
   const closest = new Map<string, Candidate>()
   function consider(id: number, rawName: string, lon: number, lat: number, ref?: string, line?: string) {
     const meters = Math.hypot((lon - place.lon) * metersLon, (lat - place.lat) * 111320)
-    if (meters > 1000) return
+    if (meters > 2500) return
     const station = rawName.endsWith('역') ? rawName : rawName + '역'
     const prev = closest.get(station)
     const exit = ref !== undefined
@@ -29,7 +29,9 @@ export function nearbyStations(place: Pick<Place, 'lon' | 'lat'>, numbered: bool
     const [id, name, ref, lon, lat, line] = row as [number, string, string, number, number, string]
     consider(id, name, lon, lat, ref, line)
   }
-  return [...closest.values()].sort((a, b) => a.meters - b.meters || a.id - b.id).slice(0, 2)
+  const ranked = [...closest.values()].sort((a, b) => a.meters - b.meters || a.id - b.id)
+  const nearby = ranked.filter(stop => stop.meters <= 1000)
+  return nearby.length ? nearby.slice(0, 2) : ranked.slice(0, 1)
 }
 
 export function stationsFor(place: Place, numbered = true): Stop[] {
@@ -41,23 +43,16 @@ export function stationsFor(place: Place, numbered = true): Stop[] {
 
 // Keep station labels within the same projection as the roads and the venue.
 export function stationRadius(place: Place) {
-  let radius = place.radius
-  const stops = stationsFor(place)
-  const meters = (s: Stop) => Math.hypot((s.lon - place.lon) * 111320 * Math.cos(place.lat * Math.PI / 180),
-    (s.lat - place.lat) * 111320)
-  const first = stops[0]
-  // Keep a close numbered exit readable. A more distant alternative still appears in the guide.
-  const focus = first && !first.directions && first.name.endsWith('번 출구') &&
-    meters(first) <= place.radius / 2 ? [first] : stops
-  for (const stop of focus) {
-    const east = Math.abs(stop.lon - place.lon) * 111320 * Math.cos(place.lat * Math.PI / 180)
-    const north = Math.abs(stop.lat - place.lat) * 111320
-    radius = Math.max(radius, east / 1.32, north * 1.10)
-  }
-  return Math.ceil(radius)
+  const first = stationsFor(place)[0]
+  // Fit the nearest entrance with room for its caption. A distant station belongs
+  // in the guide, so it should never stretch the frame beyond the neighbourhood.
+  if (!first) return 245
+  const east = Math.abs(first.lon - place.lon) * 111320 * Math.cos(place.lat * Math.PI / 180)
+  const north = Math.abs(first.lat - place.lat) * 111320
+  return Math.ceil(Math.min(260, Math.max(155, east / 1.12, north * 1.28)))
 }
 
-export function transitItems(place: Place, numbered = true): Item[] {
+export function transitItems(place: Place, numbered = true, vicinity = false): Item[] {
   const stops = stationsFor(place, numbered)
   const axes = mapScale(place)
   const items: Item[] = []
@@ -66,11 +61,12 @@ export function transitItems(place: Place, numbered = true): Item[] {
     const y = axes.cy - (stop.lat - place.lat) * axes.y
     const [left, top, right, bottom] = mapBounds
     const inMap = x >= left && x <= right && y >= top && y <= bottom
+    if (vicinity && !inMap && i > 0 && !stop.directions) continue
     const key = String.fromCharCode(65 + i)
     const parts = [stop.name]
     if (inMap) {
       items.push({ ...baseItem('transit-stop-' + key), kind: 'dot', x, y, radius: 15 })
-      parts[0] = key + '   ' + stop.name
+      if (!vicinity) parts[0] = key + '   ' + stop.name
     }
     if (stop.directions) parts.push(stop.directions)
     else {

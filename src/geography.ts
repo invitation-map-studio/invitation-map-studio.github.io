@@ -408,7 +408,8 @@ function obstacles(items: Item[]) {
       }
     } else {
       const pad = item.radius + 6
-      occupied.push([item.x - pad, item.y - pad, item.x + pad, item.y + pad])
+      const top = item.id === 'destination' ? item.radius * 2.1 + 5 : pad
+      occupied.push([item.x - pad, item.y - top, item.x + pad, item.y + pad])
     }
   }
 
@@ -417,25 +418,32 @@ function obstacles(items: Item[]) {
 
 // Place the exit name on the map when space permits. The guide below the map
 // always includes the full name, including at crowded junctions.
-export function exitLabels(items: Item[], place: Place): Item[] {
+export function exitLabels(items: Item[], place: Place, streets: Segment[] = []): Item[] {
   const { occupied, segments } = obstacles(items)
   const result: Item[] = []
   for (const [index, stop] of stationsFor(place).entries()) {
-    if (!stop.name.endsWith('번 출구')) continue
     const key = String.fromCharCode(65 + index)
     const marker = items.find(i => i.id === 'transit-stop-' + key)
     if (marker?.kind !== 'dot' || marker.hidden) continue
     const size = 25, half = textWidth(stop.name, size) / 2
-    for (const [dx, dy] of [[-half-23, 8], [half+23, 8], [0, -24], [0, 53],
+    const offsets = [[-half-23, 8], [half+23, 8], [0, -24], [0, 53],
       [-half/2, 53], [half/2, 53], [-half/2, -24], [half/2, -24],
       [-half-18, -20], [half+18, -20], [-half-26, -44], [half+26, -44],
       [-half-18, 45], [half+18, 45],
-      [-half, -42], [half, -42], [-half, 70], [half, 70]]) {
-      const pos = placement(stop.name, size, marker.x + dx, marker.y + dy, 0, segments, occupied)
-      if (!pos) continue
-      result.push(label('transit-exit-' + key, stop.name, pos.x, pos.y, size, { weight: 700 }))
-      occupied.push(pos.bounds)
-      break
+      [-half, -42], [half, -42], [-half, 70], [half, 70]]
+    // Prefer intact streets. In a dense block the caption takes priority and the
+    // renderer leaves a small gap only under the chosen text.
+    for (const lines of streets.length ? [streets, segments] : [segments]) {
+      let chosen: Placement | undefined
+      for (const [dx, dy] of offsets) {
+        chosen = placement(stop.name, size, marker.x + dx, marker.y + dy, 0, lines, occupied)
+        if (chosen) break
+      }
+      if (chosen) {
+        result.push(label('transit-exit-' + key, stop.name, chosen.x, chosen.y, size, { weight: 700 }))
+        occupied.push(chosen.bounds)
+        break
+      }
     }
   }
   return result
@@ -471,7 +479,7 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
       const position = placement(name, size, x + dx, y + dy, 0, segments, [...occupied, mark])
       if (!position) continue
       result.push(
-        { ...baseItem('building-mark-' + id, 'soft'), kind: 'dot', x, y, radius: 5 },
+        { ...baseItem('building-mark-' + id), kind: 'dot', x, y, radius: 5 },
         { ...label('building-name-' + id, name, position.x, position.y, size, { font: 'sans' }), tone: 'soft' },
       )
       names.add(key)
@@ -479,7 +487,7 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
       occupied.push(mark, position.bounds)
       break
     }
-    if (marked.length === 5) break
+    if (marked.length === 4) break
   }
   return result
 }
@@ -528,9 +536,9 @@ export function selectLocalRoads(spec: Spec, place: Place, roads: LocalRoad[], s
     const take = (entries: typeof ranked, limit: number) => {
       for (const {road} of entries.slice(0, limit)) selected.set(road.id, road)
     }
-    take(ranked.filter(r => r.road.name === street && street && r.meters <= place.radius), 6)
-    take(ranked.filter(r => !r.road.foot && r.meters <= 170), 5)
-    take(ranked.filter(r => r.road.foot && r.meters <= 130), 5)
+    take(ranked.filter(r => r.road.name === street && street && r.meters <= place.radius), 3)
+    take(ranked.filter(r => !r.road.foot && r.meters <= 95), 1)
+    take(ranked.filter(r => r.road.foot && r.meters <= 65), 1)
   }
   return [...selected.values()]
 }
@@ -613,13 +621,26 @@ export function layout(geo: Geography, name: string): Spec {
   const junctions = new Set(crossings.map(n => n.id))
   const segments: Segment[] = []
   const streets = new Map<string, { id: number; parts: Segment[] }>()
-  for (const road of roads) {
+  const transit = transitItems(place, true, true)
+  const destination: Item = { ...baseItem('destination'), kind: 'flower', x: 700, y: 605, radius: 28 }
+  // Reserve station captions before drawing the street network or placing other names.
+  const streetsForLabels: Segment[] = []
+  const simplified = roads.map(road => {
     const points = simplify(road.points.map(project), road.nodes, junctions, 10 * scale)
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1], b = points[i]
+      if (clip(a, b).length) streetsForLabels.push({ a, b, length: distance(a, b), bounds: envelope([a, b]) })
+    }
+    return { road, points }
+  })
+  const exits = exitLabels([destination, ...transit], place, streetsForLabels)
+  const captions = obstacles(exits).occupied
+  for (const { road, points } of simplified) {
     let run: Point[] = [],
       section = 0
     function flush() {
       if (run.length > 1) {
-        const width = ['motorway', 'trunk', 'primary'].includes(road.highway) ? 5 : 3
+        const width = ['motorway', 'trunk', 'primary'].includes(road.highway) ? 3.2 : 2.3
         items.push({
           ...baseItem('road-' + road.id + '-' + section++, 'soft'),
           kind: 'line',
@@ -630,32 +651,27 @@ export function layout(geo: Geography, name: string): Spec {
       run = []
     }
     for (let i = 1; i < points.length; i++) {
-      const clipped = clip(points[i - 1], points[i])
-      if (!clipped.length) {
-        flush()
-        continue
-      }
-      const [a, b] = clipped,
-        length = distance(a, b)
-      if (!length) continue
-      if (!run.length || distance(run.at(-1)!, a) > 0.03) {
-        flush()
-        run = [a]
-      }
-      run.push(b)
-      const seg = { a, b, length, bounds: envelope([a, b]) }
-      segments.push(seg)
-      if (road.name) {
-        const street = streets.get(road.name) ?? { id: road.id, parts: [] }
-        street.parts.push(seg)
-        streets.set(road.name, street)
+      const visible = clearSegments(points[i - 1], points[i], captions)
+      if (!visible.length) flush()
+      for (const [a, b] of visible) {
+        if (!run.length || distance(run.at(-1)!, a) > 0.03) {
+          flush()
+          run = [a]
+        }
+        run.push(b)
+        const seg = { a, b, length: distance(a, b), bounds: envelope([a, b]) }
+        segments.push(seg)
+        if (road.name) {
+          const street = streets.get(road.name) ?? { id: road.id, parts: [] }
+          street.parts.push(seg)
+          streets.set(road.name, street)
+        }
       }
     }
     flush()
   }
 
-  const transit = transitItems(place)
-  const occupied: Rect[] = [[664, 569, 736, 641]]
+  const occupied: Rect[] = [...captions, [673, 541, 727, 614]]
   for (const stop of transit) {
     if (stop.kind === 'dot') occupied.push([stop.x - 19, stop.y - 19, stop.x + 19, stop.y + 19])
   }
@@ -669,19 +685,19 @@ export function layout(geo: Geography, name: string): Spec {
     if (!inside([bounds[0], bounds[1]]) || !inside([bounds[2], bounds[3]]) ||
         occupied.some(rect => overlap(bounds, rect)) ||
         marked.some(p => distance(p, crossing.point) < 55)) continue
-    items.push({ ...baseItem('junction-' + crossing.id), kind: 'dot', x, y, radius: 6 })
+    items.push({ ...baseItem('junction-' + crossing.id), kind: 'dot', x, y, radius: 3.5 })
     occupied.push(bounds)
     marked.push(crossing.point)
-    if (marked.length === 6) break
+    if (marked.length === 2) break
   }
-  items.push({ ...baseItem('destination'), kind: 'flower', x: 700, y: 605, radius: 28 })
+  items.push(destination)
   // Keep the marker at its measured point while choosing a clear position for its name.
   const venueSize = Math.max(24, Math.min(40, Math.floor(990 / Math.max(1, textWidth(name, 1)))))
   const beside = textWidth(name, venueSize) / 2 + 38
   let venue: Placement | undefined
   for (const [dx, dy] of [
-    [0, -53],
-    [0, 91],
+    [0, -72],
+    [0, 64],
     [beside, 12],
     [-beside, 12],
     [beside, -20],
@@ -729,9 +745,6 @@ export function layout(geo: Geography, name: string): Spec {
     )
   }
 
-  const exits = exitLabels([...items, ...transit], place)
-  for (const item of exits) if (item.kind === 'text')
-    occupied.push(textFrame(item.text, item.size, item.x, item.y, item.angle).bounds)
   items.push(...exits)
 
   // Print a street name beside its own longest visible segments, parallel and upright.
@@ -749,7 +762,7 @@ export function layout(geo: Geography, name: string): Spec {
   )
   let streetLabels = 0
   for (const street of ranked) {
-    if (streetLabels === 5) break
+    if (streetLabels === 2) break
     let chosen: Placement | undefined
     for (const seg of street.parts.slice(0, 10)) {
       if (seg.length < Math.min(60, textWidth(street.text, 25) * 0.38)) break
@@ -804,5 +817,5 @@ export function layout(geo: Geography, name: string): Spec {
     { ...label('details', '', 700, 1320, 27), footer: true },
     { ...label('parking', '', 700, 1374, 25, { font: 'sans' }), footer: true },
   )
-  return { layout: 'minimal', ink: '#393334', items }
+  return { layout: 'minimal', style: 'vicinity', ink: '#282626', items }
 }
