@@ -2,6 +2,17 @@
 
 2026년 11월 20일 기준이다. 기본 약도에는 저장·가공 권한이 확인된 데이터만 넣는다. 네이버 자동 대조와 다시 대조 버튼은 화면 확인용이며 결과를 프로젝트, 로그, 파일 또는 이 앱의 캐시에 기록하지 않는다. [네이버 클라우드 Maps 이용약관](https://www.ncloud.com/policy/terms/maps)
 
+## 운영 설정
+
+2026-11-20 공개 작업실에 연결한 네이버클라우드 Application은 `InviteMap`이다. 웹 주소는 `https://invitation-map-studio.github.io`만 등록했다. 대표 계정 여부를 콘솔에서 확인했다. 서버용 비밀키는 사용하지 않는다.
+
+| 활성 API | 일 한도 | 월 한도 | 한도 초과 사용 |
+| --- | ---: | ---: | --- |
+| Geocoding | 100 | 1,000 | 허용 안 함 |
+| Dynamic Map | 200 | 2,000 | 허용 안 함 |
+
+공개 배포에서 일 한도를 각각 1건으로 낮춰 시험했다. 주소 조회는 첫 요청에 성공했고 다음 요청은 HTTP 400과 사용량 한도 초과 응답을 받았다. 지도는 첫 인증에 성공했고 해당 한도에 도달한 뒤 지도 인증 요청이 HTTP 400으로 거절되었다. 네이버 콘솔은 설정 적용 중 수초 동안 초과 호출이 가능하다고 안내한다. 한도 조정은 Application에서 API별로 적용한다. [네이버 Maps 이용 한도](https://guide.ncloud-docs.com/docs/application-maps-app-vpc)
+
 ## 네이버 확인 화면
 
 1. 시험용 Application에서 Web Dynamic Map과 Geocoding을 선택한다. 등록 웹 서비스 URL에는 실제 Pages 호스트를 입력한다. 콘솔에서 설정 형식과 허용 도메인을 확인한다. [Application 설정](https://guide.ncloud-docs.com/docs/maps-app) · [인증 문제 해결](https://guide.ncloud-docs.com/docs/maps-troubleshoot)
@@ -20,7 +31,7 @@
 | 지도 스타일 메타데이터·이미지 | map.pstatic.net, nrbe.pstatic.net |
 | SDK 이미지·타일 | ssl.pstatic.net, simg.pstatic.net |
 
-인증·SDK·geocoder 요청 각각에서 성공과 오류 상태, 빈 결과, 다중 후보, 승인되지 않은 도메인, 낮은 시험 한도에서 추가 요청 거절을 확인한다. 서버 비밀번호나 사용자별 API 인증은 기본 모드의 범위 밖이다. 요청 URL 원문에는 식별자와 조회 주소가 들어갈 수 있으므로 증거에는 시각, 호스트, 경로명, 상태 코드와 익명화된 건수만 남긴다. 이 문서 작성 시 운영 키, 콘솔 설정, 실제 배포 출처에서의 네이버 호출·차단은 검증되지 않았다.
+인증·SDK·geocoder 요청 각각에서 성공과 오류 상태, 빈 결과, 다중 후보, 승인되지 않은 도메인, 낮은 시험 한도에서 추가 요청 거절을 확인한다. 서버 비밀번호나 사용자별 API 인증은 기본 모드의 범위 밖이다. 요청 URL 원문에는 식별자와 조회 주소가 들어갈 수 있으므로 증거에는 시각, 호스트, 경로명, 상태 코드와 익명화된 건수만 남긴다. 실제 Pages에서 Geocoding과 Dynamic Map 인증의 정상 응답 및 일 한도 시험을 확인했다.
 
 ## Juso
 

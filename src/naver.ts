@@ -67,6 +67,8 @@ function loadSdk(key: string): Promise<NaverMaps> {
       const error = authError()
       if (view) {
         const { container } = view
+        // The SDK destroys the map itself when its authentication request fails.
+        view.disposeMap = undefined
         closeNaver(container)
         container.textContent = error.message
       }
