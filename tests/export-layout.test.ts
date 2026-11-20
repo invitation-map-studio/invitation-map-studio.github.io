@@ -122,3 +122,20 @@ test('건물 이름과 표식이 도로·예식장·사용자 편집을 피하�
     width:3, points:[[marker.x-20,marker.y], [marker.x+20,marker.y]] }]
   assert.deepEqual(buildingItems(drawing, place, '예식장', rows), [])
 })
+
+test('미등록 주소에서도 출구 소속 역·호선과 실제 출구 좌표로 가장 가까운 번호를 선택한다', async () => {
+  const { transitItems } = await import('../src/transit')
+  const { mapScale } = await import('../src/location-check')
+  const place = { id:'node/1', address:'시험 주소', lon:127.0554556, lat:37.5201877, radius:350, entrance:'address' }
+  const rows = transitItems(place)
+  const marker = rows.find(i => i.id === 'transit-stop-A')
+  const axes = mapScale(place)
+  assert.ok(marker?.kind === 'dot')
+  assert.ok(Math.abs(marker.x - (axes.cx + (127.0552336 - place.lon) * axes.x)) < 0.01)
+  assert.ok(Math.abs(marker.y - (axes.cy - (37.5198424 - place.lat) * axes.y)) < 0.01)
+  assert.ok(rows.some(i => i.kind === 'text' && /청담역 12번 출구.*7호선.*직선 약 40m/.test(i.text)))
+  const { exits } = (await import('../src/stations.json')).default
+  const other = exits.find(row => row[1] === '청담' && row[2] === '3')!
+  const changed = transitItems({ ...place, lon:Number(other[3]), lat:Number(other[4]) })
+  assert.ok(changed.some(i => i.kind === 'text' && /청담역 3번 출구.*0m/.test(i.text)))
+})

@@ -16,7 +16,7 @@ import {
   type Project,
   type Spec,
 } from './model'
-import { addresses, buildingItems, fetchGeography, layout } from './geography'
+import { addresses, buildingItems, exitLabels, fetchGeography, layout } from './geography'
 import { canonicalAddress, parseRoadAddress, mentionsVenue } from './road-address'
 import { render, serialize } from './render'
 import {
@@ -296,9 +296,16 @@ async function library() {
   }
 }
 async function use(p: Project, message: string, previous?: Project | null) {
-  // Older saved drawings keep their edits while gaining the nearby station layer.
-  if (p.geo && !p.spec.items.some(i => i.id.startsWith('transit-')))
-    p.spec.items.push(...transitItems(p.geo.place))
+  if (p.geo && !p.imported) {
+    const guides = p.spec.items.filter(i => i.id.startsWith('transit-'))
+    // Replace the original station-center layer only when its labels and pins are unedited.
+    if (!guides.length || (!guides.some(i => i.id.startsWith('transit-exit-')) &&
+        JSON.stringify(guides) === JSON.stringify(transitItems(p.geo.place, false)))) {
+      p.spec.items = p.spec.items.filter(i => !i.id.startsWith('transit-'))
+      p.spec.items.push(...transitItems(p.geo.place))
+      p.spec.items.push(...exitLabels(p.spec.items, p.geo.place))
+    }
+  }
   if (p.geo && !p.imported && p.spec.layout === 'minimal' &&
       !p.spec.items.some(item => item.id.startsWith('building-'))) {
     const place = p.geo.place
@@ -475,7 +482,7 @@ el('search').onsubmit = (e) => {
     const venue = named.length === 1 ? named[0] : registered.length === 1 && registered[0].address === address ? registered[0] : undefined
     if (venue) {
       const geo = await venue.load()
-      await makeAddress(geo.place, name || venue.name, signal, details, geo)
+      await makeAddress(geo.place, name || venue.name, signal, details === venue.name ? '' : details, geo)
       return
     }
     const stored = (await snapshots())
@@ -503,6 +510,13 @@ el('search').onsubmit = (e) => {
     const namedPlaces = list.filter(p => 'venueName' in p && typeof p.venueName === 'string' &&
       p.venueName && (name === p.venueName || mentionsVenue(details, p.venueName)))
     if (namedPlaces.length === 1) list = namedPlaces
+    else if (!name && list.length === 2) {
+      // A named address point and its unnamed building can both match one front door.
+      const point = list.find(p => p.id.startsWith('node/') && 'venueName' in p && p.venueName)
+      const building = list.find(p => /^(way|relation)\//.test(p.id) && 'venueName' in p && p.venueName === '')
+      if (point && building && Math.hypot((point.lon - building.lon) * 111320 * Math.cos(point.lat * Math.PI / 180),
+          (point.lat - building.lat) * 111320) < 12) list = [point]
+    }
     if (list.length === 1) {
       await selectCandidate(list[0], name, details, signal)
       return
@@ -553,7 +567,7 @@ async function selectCandidate(p: Place, name: string, details: string, signal: 
   } else {
     const { id, address, entrance, lat, lon, radius } = p
     const venue = 'venueName' in p && typeof p.venueName === 'string' ? p.venueName : ''
-    await makeAddress({ id, address, entrance, lat, lon, radius }, name || venue || address, signal, details)
+    await makeAddress({ id, address, entrance, lat, lon, radius }, name || venue || address, signal, details === venue ? '' : details)
   }
 }
 

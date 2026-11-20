@@ -1,5 +1,5 @@
 import type { Building } from './buildings'
-import { mapBounds, transitItems } from './transit'
+import { mapBounds, stationsFor, transitItems } from './transit'
 import { indexedAddresses } from './address-index'
 import { registeredPlaces, mapScale } from './location-check'
 import { parseRoadAddress, matchesRegion } from './road-address'
@@ -121,6 +121,7 @@ export async function addresses(
     return [
       {
         address,
+        venueName: e.tags?.['name:ko'] || e.tags?.name || '',
         display: [
           e.tags?.['name:ko'] || e.tags?.name,
           e.tags?.['addr:city'],
@@ -392,12 +393,11 @@ function placement(
   return { x, y, angle, bounds }
 }
 
-/** Add building names around the actual drawing, including user-positioned text and symbols. */
-export function buildingItems(spec: Spec, place: Place, venue: string, buildings: Building[]): Item[] {
+function obstacles(items: Item[]) {
   const occupied: Rect[] = []
   const segments: Segment[] = []
-  for (const item of spec.items) {
-    if (item.hidden || item.footer || item.id.startsWith('building-')) continue
+  for (const item of items) {
+    if (item.hidden || item.footer) continue
     if (item.kind === 'text') {
       occupied.push(textFrame(item.text, item.size, item.x, item.y, item.angle).bounds)
     } else if (item.kind === 'line') {
@@ -411,6 +411,38 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
     }
   }
 
+  return { occupied, segments }
+}
+
+// Place the exit name on the map when space permits. The guide below the map
+// always includes the full name, including at crowded junctions.
+export function exitLabels(items: Item[], place: Place): Item[] {
+  const { occupied, segments } = obstacles(items)
+  const result: Item[] = []
+  for (const [index, stop] of stationsFor(place).entries()) {
+    if (!stop.name.endsWith('번 출구')) continue
+    const key = String.fromCharCode(65 + index)
+    const marker = items.find(i => i.id === 'transit-stop-' + key)
+    if (marker?.kind !== 'dot' || marker.hidden) continue
+    const size = 25, half = textWidth(stop.name, size) / 2
+    for (const [dx, dy] of [[-half-23, 8], [half+23, 8], [0, -24], [0, 53],
+      [-half/2, 53], [half/2, 53], [-half/2, -24], [half/2, -24],
+      [-half-18, -20], [half+18, -20], [-half-26, -44], [half+26, -44],
+      [-half-18, 45], [half+18, 45],
+      [-half, -42], [half, -42], [-half, 70], [half, 70]]) {
+      const pos = placement(stop.name, size, marker.x + dx, marker.y + dy, 0, segments, occupied)
+      if (!pos) continue
+      result.push(label('transit-exit-' + key, stop.name, pos.x, pos.y, size, { weight: 700 }))
+      occupied.push(pos.bounds)
+      break
+    }
+  }
+  return result
+}
+
+/** Add building names around the actual drawing, including user-positioned text and symbols. */
+export function buildingItems(spec: Spec, place: Place, venue: string, buildings: Building[]): Item[] {
+  const { occupied, segments } = obstacles(spec.items.filter(i => !i.id.startsWith('building-')))
   const axes = mapScale(place)
   const normalizeName = (name: string) => name.replace(/\s+/g, '').toLowerCase()
   const venueName = normalizeName(venue)
@@ -598,6 +630,11 @@ export function layout(geo: Geography, name: string): Spec {
       ),
     )
   }
+
+  const exits = exitLabels([...items, ...transit], place)
+  for (const item of exits) if (item.kind === 'text')
+    occupied.push(textFrame(item.text, item.size, item.x, item.y, item.angle).bounds)
+  items.push(...exits)
 
   // Print a street name beside its own longest visible segments, parallel and upright.
   // Prioritize the address street, then those with the most room for a legible label.

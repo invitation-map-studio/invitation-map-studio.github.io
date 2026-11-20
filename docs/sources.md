@@ -46,7 +46,7 @@ python3 data/prepare_dasan74.py original.json dasan74.updated.json --fetched-at 
 
 ## 약도에 표시하는 역
 
-전국 OSM 추출본(2026-11-18 UTC)에서 도시철도·전철망 또는 운행 방식이 표시된 역 노드 923개를 추출했다. 같은 추출본에 `python3 scripts/prepare-stations.py south-korea-latest.osm.pbf src/stations.json`을 적용해 재생성할 수 있다. 일반 약도는 목적지 대표점에서 직선 1 km 안의 서로 다른 역을 최대 두 곳 안내한다. 주소로 약도를 만들면 두 역이 들어오도록 표시 범위를 정한다. 기존 저장본에서 지도 밖에 있는 역은 방향을 적는다. [원천 자료와 ODbL](https://download.geofabrik.de/asia/south-korea.html)
+전국 OSM 추출본(2026-11-18 UTC)에서 도시철도·전철망 또는 운행 방식이 표시된 역 노드 923개를 추출했다. 같은 추출본에 `python3 scripts/prepare-stations.py south-korea-latest.osm.pbf src/stations.json`을 적용해 재생성할 수 있다. 일반 약도는 목적지 대표점에서 직선 1 km 안의 서로 다른 역을 최대 두 곳 안내한다. 약도 범위는 가까운 역을 기준으로 정하고, 예식장 인근에 출구가 있으면 그 주변을 자세히 표시한다. 기존 저장본에서 지도 밖에 있는 역은 방향을 적는다. [원천 자료와 ODbL](https://download.geofabrik.de/asia/south-korea.html)
 
 한국프레스센터는 행사장이 안내하는 시청역 4번 출구(1·2호선, 도보 3분)와 광화문역 5번 출구(5호선, 도보 8분)를 사용한다. 출구 좌표는 위 추출본에서 각 역의 정류장 구역 관계(8059934, 5672805)에 속한 번호 표기 노드로 확인했다. [행사장 교통 안내](https://www.koreapresscenter.com/) · [시청역 4번 출구](https://www.openstreetmap.org/node/3404904656) · [광화문역 5번 출구](https://www.openstreetmap.org/node/3403193751)
 
@@ -59,3 +59,8 @@ python3 data/prepare_dasan74.py original.json dasan74.updated.json --fetched-at 
 ## 인쇄용 주변 건물
 
 전국 OSM 추출본에서 이름과 용도가 확인되는 관공서·학교·병원·문화시설·호텔·상업 건물을 모았다. `scripts/prepare-buildings.py`로 같은 PBF에서 `public/buildings` 자료를 다시 생성할 수 있다. 지도 점은 등록된 좌표를, 건물 경계는 외곽 범위의 중심을 사용한다. 약도를 열 때 해당 구역 자료를 읽어 목적지와의 거리 및 시설 종류에 따라 최대 다섯 곳을 고른다. 같은 이름과 겹치는 표식을 걸러내고, 각 건물은 작은 사각형과 이름으로 그린다. [건물 색인과 원천 시각](../public/buildings/index.json) · [원천 파일의 해시](../public/address-index/source.json)
+
+
+## 주소에서 지하철 출구 자동 선택
+
+같은 전국 OSM 추출본에서 번호가 있는 지하철 출입구와 역의 정류장 구역(stop_area) 소속을 연결한다. 작업실은 사용자가 입력한 목적지의 대표점으로부터 직선 1 km 안에 있는 출구를 비교하여 역마다 가장 가까운 출구를 선택한다. 호선은 해당 구역의 정차 지점이나 승강장이 노선 관계에도 포함된 경우에 표시한다. 번호와 소속 역을 확인할 수 없는 곳은 역 대표점으로 안내한다. 거리 표시는 출구와 목적지 사이의 직선거리다. 번호가 같은 다른 역의 출구를 좌표 근접성만으로 추정하지 않는다. [색인 생성 코드](../scripts/prepare-stations.py) · [한국 OSM 원천](https://download.geofabrik.de/asia/south-korea.html)

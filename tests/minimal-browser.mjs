@@ -4,15 +4,17 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { chromium } from 'playwright-core'
 import { strFromU8, unzipSync } from 'fflate'
 
-const [origin, passwordFile] = process.argv.slice(2)
+const [origin, passwordFile, onlyCase] = process.argv.slice(2)
 const local = origin === 'http://127.0.0.1:4792/'
 assert.ok(local || origin === 'https://invitation-map-studio.github.io/')
 const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' })
 const cases = [
   ['서울특별시 중구 세종대로 124 (태평로1가, 한국프레스센터 19~20층)', '한국프레스센터', '세종대로', '시청역', 'press'],
+  ['서울특별시 강남구 학동로 519', '빌라드지디 청담', '학동로', '청담역 12번 출구', 'cheongdam'],
   ['서울특별시 강남구 테헤란로 610', '글래드호텔', '테헤란로', '삼성역', 'glad'],
-]
+].filter(row => !onlyCase || row[4] === onlyCase)
+assert.ok(cases.length)
 try {
   const page = await browser.newPage()
   const errors = []
@@ -29,7 +31,8 @@ try {
       window.naver = {maps:{LatLng:class {},Map:class {destroy(){}},Marker:class {setMap(){}},
         Service:{Status:{OK:1},geocode:({query},cb)=>{
           window.requests++
-          const [x,y]=query.includes('세종대로')?['126.97785','37.56741']:['127.06457','37.50886']
+          const [x,y]=query.includes('세종대로')?['126.97785','37.56741']:
+            query.includes('학동로')?['127.05546','37.52019']:['127.06457','37.50886']
           cb(1,{v2:{status:'OK',addresses:[{roadAddress:query,x,y}]}})
         }}}}; window.onWeddingMapSdkReady()`}))
   }
@@ -51,6 +54,10 @@ try {
     assert.equal(await paper.locator('rect[data-item^="building-mark-"]').count(), buildings.length)
     assert.equal(new Set(buildings).size, buildings.length)
     assert.match(await paper.textContent(),new RegExp(station))
+    if (slug === 'cheongdam') {
+      assert.equal(await paper.locator('[data-item="transit-exit-A"]').textContent(), station)
+      assert.match(await paper.locator('[data-item="transit-guide-A"]').textContent(), /청담역 12번 출구.*7호선.*직선 약 40m/)
+    }
     await page.locator('#download').click()
     const link = page.getByRole('link', {name:'전체 ZIP 다운로드'})
     await link.waitFor({timeout:120000})
@@ -68,7 +75,7 @@ try {
     writeFileSync('artifacts/minimal/'+slug+'.pdf',pdf)
     console.log(name, buildings.join(', '), await page.locator('#naver-map p').textContent(), Object.keys(files).length+'개 출력 파일')
   }
-  if (local) assert.equal(await page.evaluate(() => window.requests),2)
+  if (local) assert.equal(await page.evaluate(() => window.requests),cases.length)
   assert.deepEqual(errors,[])
 } finally {
   await browser.close()
