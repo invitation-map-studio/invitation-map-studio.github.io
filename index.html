@@ -77,7 +77,6 @@
             </p>
             <p id="naver-notice" class="fine" hidden>주소로 약도를 만들면 네이버 지도에서 예식장 위치를 자동 대조합니다. 인쇄본에는 큰길·교차로·주변 건물과 예식장을 표시하고, 가까운 지하철역의 출구 번호와 직선거리를 자동으로 찾습니다.</p>
             <button id="naver" hidden>현재 약도 네이버 위치 대조</button>
-            <div id="naver-map"></div>
           </section>
           <section>
             <h2>내 프로젝트</h2>
@@ -135,6 +134,16 @@
           </section>
         </aside>
         <article>
+          <section id="fallback-info" hidden aria-live="polite">
+            <h2 id="fallback-title">네이버 지도</h2>
+            <p id="fallback-address"></p>
+            <p id="fallback-status"></p>
+            <div class="row">
+              <a id="fallback-link" target="_blank" rel="noopener noreferrer">네이버 지도에서 열기</a>
+              <button id="print-card" type="button" disabled>주소·지도 QR 인쇄</button>
+            </div>
+          </section>
+          <div id="print-project">
           <div class="previewbar">
             <div>
               <h2 id="project-title">약도 미리보기</h2>
@@ -157,9 +166,15 @@
             <summary>보관된 완성 파일</summary>
             <div id="archives"></div>
           </details>
+          </div>
+          <div id="naver-map"></div>
         </article>
       </div>
     </main>
+    <section id="address-card" aria-label="인쇄용 주소 안내">
+      <h1>오시는 길</h1><h2 id="card-name"></h2><p id="card-address"></p>
+      <img id="card-qr" alt="네이버 지도에서 주소 열기" /><p>QR 코드를 스캔하면 네이버 지도가 열립니다.</p>
+    </section>
     <footer>오시는 길 <span>청첩장 약도 작업실</span></footer>
     <script type="module" src="./src/main.ts"></script>
   </body>

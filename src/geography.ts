@@ -60,14 +60,14 @@ async function request(statement: string, signal: AbortSignal) {
     } catch (error) {
       if (signal.aborted) throw signal.reason
       if (error instanceof DOMException && error.name === 'TimeoutError')
-        throw Error('지도 공급자 응답 시간이 초과됐습니다. 잠시 후 다시 확인해 주세요.')
+        throw Error('Overpass 도로·주소 자료 조회 시간이 초과됐습니다.')
       if (attempt === 2) throw error
     }
     await waitForRetry(1500 * 2 ** attempt, signal)
   }
 }
 async function query(statement: string, signal: AbortSignal): Promise<Element[]> {
-  if (Date.now() < retryAfter) throw Error('지도 공급자의 대기 시간이 끝난 후 다시 시도해 주세요.')
+  if (Date.now() < retryAfter) throw Error('Overpass의 대기 시간이 끝난 후 다시 시도해 주세요.')
   const response = await request(statement, signal)
   if (!response.ok) {
     const retry = response.headers.get('Retry-After')
@@ -76,7 +76,7 @@ async function query(statement: string, signal: AbortSignal): Promise<Element[]>
         retry && /^\d+$/.test(retry) ? Number(retry) * 1000 : Date.parse(retry ?? '') - Date.now()
       retryAfter = Date.now() + (Number.isFinite(delay) && delay > 0 ? delay : 60000)
     }
-    throw Error(`지도 공급자 응답 ${response.status}.${retry ? ' 다시 확인할 시간 ' + retry : ''}`)
+    throw Error(`Overpass 응답 ${response.status}.${retry ? ' 다시 확인할 시간 ' + retry : ''}`)
   }
   const reader = response.body?.getReader()
   if (!reader) throw Error('지도 응답을 읽을 수 없습니다.')
@@ -94,7 +94,7 @@ async function query(statement: string, signal: AbortSignal): Promise<Element[]>
   }
   const json = JSON.parse(await new Blob(chunks).text())
   if (json.remark || !Array.isArray(json.elements) || json.elements.length > 20000)
-    throw Error('지도 공급자가 불완전한 데이터를 반환했습니다.')
+    throw Error('Overpass가 불완전한 데이터를 반환했습니다.')
   return json.elements
 }
 export async function addresses(

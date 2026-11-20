@@ -7,7 +7,7 @@ export const mapBounds = [76, 160, 1324, 1045] as const
 
 type Stop = { name: string; lon: number; lat: number; directions?: string; line?: string }
 
-function nearbyStations(place: Place, numbered: boolean): Stop[] {
+export function nearbyStations(place: Pick<Place, 'lon' | 'lat'>, numbered: boolean): Stop[] {
   const metersLon = 111320 * Math.cos(place.lat * Math.PI / 180)
   type Candidate = Stop & { meters: number; id: number; exit: boolean }
   const closest = new Map<string, Candidate>()

@@ -37,7 +37,7 @@ import { importProject } from './validate'
 import { stationRadius, transitItems } from './transit'
 import { buildingsNear } from './buildings'
 import { indexedRoads } from './major-roads'
-import { closeNaver, showNaver } from './naver'
+import { closeNaver, showNaver, updateNaverMarker } from './naver'
 import { localLocationCheck, markerPoint } from './location-check'
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const field = (id: string) => el<HTMLInputElement>(id)
@@ -172,8 +172,83 @@ function hook(id: string, fn: (s: AbortSignal) => Promise<void>) {
 function searchAction(fn: (signal: AbortSignal) => Promise<void>) {
   return action(fn, 'search')
 }
+let fallbackTimer: number | undefined
+let fallback: { address: string; name: string } | undefined
+function endFallback(keepAddress?: string) {
+  if (!fallback) return
+  if (fallback.address !== keepAddress) {
+    closeNaver(el('naver-map'))
+    el('naver-map').replaceChildren()
+    naverSubject = ''
+  }
+  fallback = undefined
+  document.body.classList.remove('showing-fallback')
+  el('fallback-info').hidden = true
+  el('card-qr').removeAttribute('src')
+  el('search-preview').hidden = true
+  el('search-preview').setAttribute('href', '#project-title')
+  el('search-preview').textContent = '생성된 약도 보기'
+}
+
+function openFallback(address: string, name: string) {
+  if (fallback?.address === address && fallback.name === name) return
+  const subject = { address, name }
+  fallback = subject
+  naverSubject = address
+  const url = 'https://map.naver.com/p/search/' + encodeURIComponent(address)
+  document.body.classList.add('showing-fallback')
+  el('fallback-info').hidden = false
+  el('fallback-title').textContent = name ? name + ' · 네이버 지도' : '네이버 지도'
+  el('fallback-address').textContent = address
+  el('fallback-status').textContent = '인쇄용 약도에 쓸 주소와 도로 자료를 찾는 중입니다.'
+  el<HTMLAnchorElement>('fallback-link').href = url
+  const preview = el<HTMLAnchorElement>('search-preview')
+  preview.href = '#fallback-title'
+  preview.textContent = '네이버 지도 보기'
+  preview.hidden = false
+  el('card-name').textContent = name
+  el('card-address').textContent = address
+  const print = el<HTMLButtonElement>('print-card')
+  print.disabled = true
+  const img = el<HTMLImageElement>('card-qr')
+  img.removeAttribute('src')
+  void import('qrcode-generator').then(async ({ default: qrcode }) => {
+    if (fallback !== subject) return
+    const qr = qrcode(0, 'M')
+    qr.addData(url)
+    qr.make()
+    img.src = qr.createDataURL(5)
+    await img.decode()
+    if (fallback === subject) print.disabled = false
+  }).catch(() => {
+    if (fallback === subject) print.textContent = 'QR 인쇄를 준비할 수 없습니다'
+  })
+  print.textContent = '주소·지도 QR 인쇄'
+  if (naverKey) void displayNaver(address)
+  else el('naver-map').textContent = '위 링크에서 네이버 지도를 열 수 있습니다.'
+}
+el('print-card').onclick = () => window.print()
+
+async function withMapFallback(address: string, name: string, signal: AbortSignal, lookup: () => Promise<void>) {
+  fallbackTimer = window.setTimeout(() => {
+    if (!signal.aborted) openFallback(address, name)
+  }, 1500)
+  try {
+    await lookup()
+  } catch (error) {
+    if (signal.aborted) endFallback()
+    else {
+      openFallback(address, name)
+      el('fallback-status').textContent = '인쇄용 약도 자료를 확보하지 못했습니다. 주소와 지도 QR은 지금 인쇄할 수 있습니다.'
+    }
+    throw error
+  } finally {
+    clearTimeout(fallbackTimer)
+  }
+}
 el('cancel').onclick = el('search-cancel').onclick = () => busy?.abort()
 function clearSearch() {
+  endFallback()
   backgroundRoads?.abort()
   el('search-preview').hidden = true
   el('search-status').textContent = ''
@@ -196,13 +271,13 @@ function fields() {
 let naverSubject = ''
 function paint() {
   if (!current) return
-  const subject = JSON.stringify([current.address, markerPoint(current)])
+  const subject = current.address
   if (naverSubject !== subject) {
     const container = el('naver-map')
     closeNaver(container)
     container.replaceChildren()
     naverSubject = subject
-  }
+  } else updateNaverMarker(el('naver-map'), markerPoint(current))
   clearFiles()
   el('paper').replaceChildren(render(current, field('maponly').checked, true))
   el('project-title').textContent = current.name
@@ -323,6 +398,8 @@ async function use(p: Project, message: string, previous?: Project | null) {
       p.spec.items.push(...prior.spec.items.filter(i => i.id.startsWith('building-')))
     }
   }
+  clearTimeout(fallbackTimer)
+  endFallback(p.address)
   current = p
   current.lastAccessedAt = iso()
   history = []
@@ -469,75 +546,79 @@ el('search').onsubmit = (e) => {
     const parsed = parseRoadAddress(input)
     const address = canonicalAddress(parsed.address), details = parsed.details
     const name = normalize(field('placename').value)
-    const area = el('candidates')
-    if (isDasan(address)) {
-      await makeAddress(knownGeo.place, name || fixture.name, signal, details, knownGeo, fixture.fetchedAt)
-      return
-    }
-    status('도로명과 건물번호로 후보를 찾고 있습니다.')
-    const registered = catalog.filter(
-      (r) => r.address === address || r.address.endsWith(' ' + address),
-    )
-    const named = registered.filter((r) => name === r.name || mentionsVenue(details, r.name))
-    const venue = named.length === 1 ? named[0] : registered.length === 1 && registered[0].address === address ? registered[0] : undefined
-    if (venue) {
-      const geo = await venue.load()
-      await makeAddress(geo.place, name || venue.name, signal, details === venue.name ? '' : details, geo)
-      return
-    }
-    const stored = (await snapshots())
-      .map((s) => s.geo.place)
-      .filter((p) => normalize(p.address) === address)
-    let list: Place[]
-    try {
-      list = await navigator.locks.request('wedding-map-provider', { signal }, () =>
-        addresses(address, signal, registered.length === 0 && !stored.length),
-      )
-    } catch (error) {
-      if ((!registered.length && !stored.length) || signal.aborted) throw error
-      list = []
-    }
-    for (const place of stored) if (!list.some(p => p.id === place.id)) list.push(place)
-    for (const row of registered) {
-      if (list.some((p) => p.id === row.site)) continue
-      const geo = await row.load()
-      list.unshift({ ...geo.place, address })
-    }
-    if (!list.length)
-      throw Error(
-        '이 주소에 연결된 OSM 건물번호가 없습니다. 주소를 확인하거나 검증한 프로젝트 JSON을 열어 주세요.',
-      )
-    const namedPlaces = list.filter(p => 'venueName' in p && typeof p.venueName === 'string' &&
-      p.venueName && (name === p.venueName || mentionsVenue(details, p.venueName)))
-    if (namedPlaces.length === 1) list = namedPlaces
-    else if (!name && list.length === 2) {
-      // A named address point and its unnamed building can both match one front door.
-      const point = list.find(p => p.id.startsWith('node/') && 'venueName' in p && p.venueName)
-      const building = list.find(p => /^(way|relation)\//.test(p.id) && 'venueName' in p && p.venueName === '')
-      if (point && building && Math.hypot((point.lon - building.lon) * 111320 * Math.cos(point.lat * Math.PI / 180),
-          (point.lat - building.lat) * 111320) < 12) list = [point]
-    }
-    if (list.length === 1) {
-      await selectCandidate(list[0], name, details, signal)
-      return
-    }
-    if (stored.length) {
-      const b = document.createElement('button')
-      b.textContent = '같은 주소의 다른 후보 다시 조회'
-      b.onclick = searchAction(async (s) => {
-        status('주소 후보를 다시 조회하고 있습니다.')
-        const found = await navigator.locks.request('wedding-map-provider', { signal: s }, () =>
-          addresses(address, s),
-        )
-        area.replaceChildren()
-        showCandidates(found, name, details)
-        status(found.length ? '조회한 위치를 선택해 주세요.' : '추가 후보가 없습니다.')
-      })
-      area.append(b)
-    }
-    status('조회한 대표점 중 제작할 위치를 선택해 주세요. 행정구역과 입구를 확인하세요.')
-    showCandidates(list, name, details)
+    await withMapFallback(address, name, signal, () => searchAddress(address, name, details, signal))
   })()
+}
+async function searchAddress(address: string, name: string, details: string, signal: AbortSignal) {
+  const area = el('candidates')
+  if (isDasan(address)) {
+    await makeAddress(knownGeo.place, name || fixture.name, signal, details, knownGeo, fixture.fetchedAt)
+    return
+  }
+  status('도로명과 건물번호로 후보를 찾고 있습니다.')
+  const registered = catalog.filter(
+    (r) => r.address === address || r.address.endsWith(' ' + address),
+  )
+  const named = registered.filter((r) => name === r.name || mentionsVenue(details, r.name))
+  const venue = named.length === 1 ? named[0] : registered.length === 1 && registered[0].address === address ? registered[0] : undefined
+  if (venue) {
+    const geo = await venue.load()
+    await makeAddress(geo.place, name || venue.name, signal, details === venue.name ? '' : details, geo)
+    return
+  }
+  const stored = (await snapshots())
+    .map((s) => s.geo.place)
+    .filter((p) => normalize(p.address) === address)
+  let list: Place[]
+  try {
+    list = await navigator.locks.request('wedding-map-provider', { signal }, () =>
+      addresses(address, signal, registered.length === 0 && !stored.length),
+    )
+  } catch (error) {
+    if ((!registered.length && !stored.length) || signal.aborted) throw error
+    list = []
+  }
+  for (const place of stored) if (!list.some(p => p.id === place.id)) list.push(place)
+  for (const row of registered) {
+    if (list.some((p) => p.id === row.site)) continue
+    const geo = await row.load()
+    list.unshift({ ...geo.place, address })
+  }
+  if (!list.length)
+    throw Error(
+      '이 주소에 연결된 OSM 건물번호가 없습니다. 주소를 확인하거나 검증한 프로젝트 JSON을 열어 주세요.',
+    )
+  const namedPlaces = list.filter(p => 'venueName' in p && typeof p.venueName === 'string' &&
+    p.venueName && (name === p.venueName || mentionsVenue(details, p.venueName)))
+  if (namedPlaces.length === 1) list = namedPlaces
+  else if (!name && list.length === 2) {
+    // A named address point and its unnamed building can both match one front door.
+    const point = list.find(p => p.id.startsWith('node/') && 'venueName' in p && p.venueName)
+    const building = list.find(p => /^(way|relation)\//.test(p.id) && 'venueName' in p && p.venueName === '')
+    if (point && building && Math.hypot((point.lon - building.lon) * 111320 * Math.cos(point.lat * Math.PI / 180),
+        (point.lat - building.lat) * 111320) < 12) list = [point]
+  }
+  if (list.length === 1) {
+    await selectCandidate(list[0], name, details, signal)
+    return
+  }
+  if (stored.length) {
+    const b = document.createElement('button')
+    b.textContent = '같은 주소의 다른 후보 다시 조회'
+    b.onclick = searchAction(async (s) => {
+      status('주소 후보를 다시 조회하고 있습니다.')
+      const found = await navigator.locks.request('wedding-map-provider', { signal: s }, () =>
+        addresses(address, s),
+      )
+      area.replaceChildren()
+      showCandidates(found, name, details)
+      status(found.length ? '조회한 위치를 선택해 주세요.' : '추가 후보가 없습니다.')
+    })
+    area.append(b)
+  }
+  endFallback()
+  status('조회한 대표점 중 제작할 위치를 선택해 주세요. 행정구역과 입구를 확인하세요.')
+  showCandidates(list, name, details)
 }
 async function makeAddress(place: Place, name: string, signal: AbortSignal, details: string,
   fallback?: Geography, fetchedAt = datasetAt) {
@@ -583,7 +664,7 @@ function showCandidates(list: Place[], name: string, details: string) {
     ]
       .filter(Boolean)
       .join(' · ')
-    b.onclick = searchAction(signal => selectCandidate(p, name, details, signal))
+    b.onclick = searchAction(signal => withMapFallback(p.address, name, signal, () => selectCandidate(p, name, details, signal)))
     el('candidates').append(b)
   }
 }
@@ -806,15 +887,23 @@ hook('print-preview', async (signal) => {
 const naverKey = import.meta.env.VITE_NAVER_PUBLIC_KEY
 el('naver').hidden = !naverKey
 el('naver-notice').hidden = !naverKey
-async function checkWithNaver() {
+async function displayNaver(address: string, point?: ReturnType<typeof markerPoint>) {
   const container = el('naver-map')
   try {
-    await showNaver(container, current.address, naverKey, markerPoint(current))
+    await showNaver(container, address, naverKey, point)
   } catch (error) {
-    container.textContent = error instanceof Error ? error.message : '네이버 위치 대조에 실패했습니다.'
+    if (naverSubject === address) container.textContent = error instanceof Error ? error.message : '네이버 위치 대조에 실패했습니다.'
   }
 }
-hook('naver', checkWithNaver)
+function checkWithNaver() {
+  naverSubject = current.address
+  return displayNaver(current.address, markerPoint(current))
+}
+hook('naver', async () => {
+  const checked = checkWithNaver()
+  el('naver-map').scrollIntoView({ block: 'center' })
+  await checked
+})
 el('relock').onclick = () => {
   backgroundRoads?.abort()
   busy?.abort()

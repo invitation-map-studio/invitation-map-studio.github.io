@@ -1,5 +1,6 @@
 import { compareNaverAddress } from './location-check'
 import type { Point } from './model'
+import { nearbyStations } from './transit'
 interface AddressResult {
   roadAddress?: string
   jibunAddress?: string
@@ -12,7 +13,7 @@ interface MapInstance {
 interface NaverMaps {
   LatLng: new (latitude: number, longitude: number) => object
   Map: new (area: HTMLElement, options: { center: object; zoom: number }) => MapInstance
-  Marker: new (options: { position: object; map: MapInstance }) => { setMap(map: null): void }
+  Marker: new (options: { position: object; map: MapInstance; title?: string }) => { setMap(map: null): void }
   Service: {
     Status: { OK: unknown }
     geocode(
@@ -40,7 +41,7 @@ const authError = () =>
 let sdkLoad: Promise<NaverMaps> | undefined
 let loadedKey = ''
 let view:
-  | { container: HTMLElement; requestId: string; controller: AbortController; disposeMap?: () => void }
+  | { container: HTMLElement; requestId: string; markerPoint?: Point; updateInfo?: () => void; controller: AbortController; disposeMap?: () => void }
   | undefined
 
 function loadSdk(key: string): Promise<NaverMaps> {
@@ -132,6 +133,12 @@ export function closeNaver(container: HTMLElement): void {
   container.replaceChildren()
 }
 
+export function updateNaverMarker(container: HTMLElement, markerPoint?: Point) {
+  if (view?.container !== container) return
+  view.markerPoint = markerPoint
+  view.updateInfo?.()
+}
+
 export async function showNaver(
   container: HTMLElement,
   address: string,
@@ -143,11 +150,14 @@ export async function showNaver(
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(key)) throw new Error('네이버 지도 공개 키 설정이 필요합니다.')
   if (!query || query.length > 200)
     throw new Error('실시간으로 확인할 주소를 200자 이내로 입력해 주세요.')
-  const requestId = JSON.stringify([key, query, markerPoint])
-  if (view?.container === container && view.requestId === requestId) return
+  const requestId = JSON.stringify([key, query])
+  if (view?.container === container && view.requestId === requestId) {
+    updateNaverMarker(container, markerPoint)
+    return
+  }
   if (view) closeNaver(view.container)
   const controller = new AbortController()
-  const current: NonNullable<typeof view> = { container, controller, requestId }
+  const current: NonNullable<typeof view> = { container, controller, requestId, markerPoint }
   view = current
   const close = document.createElement('button')
   close.type = 'button'
@@ -172,15 +182,24 @@ export async function showNaver(
       const point = new maps.LatLng(Number(item.y), Number(item.x))
       area.hidden = false
       const map = new maps.Map(area, { center: point, zoom: 17 })
-      const marker = new maps.Marker({ position: point, map })
+      const marker = new maps.Marker({ position: point, map, title: item.roadAddress || item.jibunAddress })
+      const coords: Point = [Number(item.x), Number(item.y)]
+      const [stop] = nearbyStations({ lon: coords[0], lat: coords[1] }, true)
+      const stationMarker = stop && new maps.Marker({
+        position: new maps.LatLng(stop.lat, stop.lon), map, title: stop.name,
+      })
       current.disposeMap = () => {
+        stationMarker?.setMap(null)
         marker.setMap(null)
         map.destroy()
       }
-      const comparison = markerPoint
-        ? compareNaverAddress(address, item.roadAddress ?? '', [Number(item.x), Number(item.y)], markerPoint)
-        : '꽃 표식 좌표 확인 필요'
-      info.textContent = `네이버 위치 대조 · ${comparison}. 출입구는 별도 확인이 필요합니다.`
+      current.updateInfo = () => {
+        const comparison = current.markerPoint
+          ? '네이버 위치 대조 · ' + compareNaverAddress(address, item.roadAddress ?? '', coords, current.markerPoint) + '. 출입구는 별도 확인이 필요합니다.'
+          : '네이버 주소 위치 · ' + (item.roadAddress || item.jibunAddress)
+        info.textContent = stop ? comparison + ' · 가까운 지하철 ' + stop.name + ' (OpenStreetMap)' : comparison
+      }
+      current.updateInfo()
     }
     for (const item of matches) {
       const lon = Number(item?.x)
