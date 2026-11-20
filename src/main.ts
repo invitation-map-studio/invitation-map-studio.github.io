@@ -91,8 +91,8 @@ let current: Project,
   busy: AbortController | null = null
 let urls: string[] = []
 let searching = false
-function status(message: string, error = false) {
-  const output = el(searching ? 'search-status' : 'status')
+function status(message: string, error = false, id = searching ? 'search-status' : 'status') {
+  const output = el(id)
   output.textContent = message
   output.classList.toggle('error', error)
 }
@@ -110,11 +110,14 @@ function link(file: Blob, name: string, parent: HTMLElement, caption = name) {
   parent.append(a)
   return a
 }
-function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 'studio' = 'studio') {
+function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 'studio' | 'review' = 'studio') {
   return async () => {
     if (busy) return
     busy = new AbortController()
     searching = origin === 'search'
+    const reviewButton = el<HTMLButtonElement>('review')
+    reviewButton.disabled = true
+    reviewButton.textContent = origin === 'review' ? '저장 중…' : searching ? '지도 조회 중…' : '작업 진행 중…'
     const controls = searching
       ? document.querySelectorAll<HTMLElement>(
           '#search,#candidates,aside section:not(:first-child),#naver',
@@ -138,9 +141,12 @@ function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 's
             : e.message
           : '작업에 실패했습니다.',
         true,
+        origin === 'review' ? 'review-status' : undefined,
       )
     } finally {
       busy = null
+      reviewButton.disabled = false
+      reviewButton.textContent = '대조 기록 저장'
       controls.forEach((control) => (control.inert = false))
       cancel.hidden = true
       if (searching) {
@@ -231,6 +237,7 @@ function paint() {
   field('review-source').value = current.review.evidence?.url ?? ''
   for (const b of el('review-checks').querySelectorAll('input'))
     b.checked = current.review.status === 'checked'
+  status(current.review.status === 'checked' ? '대조 기록을 저장했습니다. ' + date(current.review.verifiedAt) : '', false, 'review-status')
 }
 async function library() {
   const list = (await projects()).sort((a, b) => b.lastAccessedAt.localeCompare(a.lastAccessedAt))
@@ -268,12 +275,12 @@ async function use(p: Project, message: string) {
   if (searching) el('search-preview').hidden = false
 }
 async function modify(next: Project) {
+  next.lastAccessedAt = iso()
+  await save(next)
   history.push(structuredClone(current))
   if (history.length > 25) history.shift()
   current = next
-  current.lastAccessedAt = iso()
   paint()
-  await save(current)
   await library()
   status('이 기기에 편집 내용을 저장했습니다.')
 }
@@ -532,16 +539,26 @@ hook('undo', async () => {
     status('직전 편집을 취소했습니다.')
   }
 })
-hook('review', async () => {
-  const note = field('review-note').value.trim(),
-    url = new URL(field('review-source').value)
-  if (
-    url.protocol !== 'https:' ||
-    !['map.naver.com', 'm.map.naver.com', 'naver.me'].includes(url.hostname) ||
-    !note ||
-    !Array.from(el('review-checks').querySelectorAll('input')).every((b) => b.checked)
-  )
-    throw Error('직접 확인한 지도 URL, 네 가지 대조 항목과 관찰 기록을 입력해 주세요.')
+el('review-panel').addEventListener('input', () => status('', false, 'review-status'))
+el('review-map').addEventListener('click', () => {
+  const source = field('review-source')
+  if (!source.value.trim()) {
+    source.value = el<HTMLAnchorElement>('review-map').href
+    status('열어 본 네이버 지도 링크를 입력했습니다.', false, 'review-status')
+  }
+})
+el('review').addEventListener('click', action(async () => {
+  const note = field('review-note').value.trim()
+  const source = field('review-source').value.trim()
+  const url = URL.canParse(source) ? new URL(source) : null
+  const missing = el('review-checks').querySelectorAll('input:not(:checked)').length
+  const errors: string[] = []
+  if (!note) errors.push('대조 방법과 관찰 내용을 입력해 주세요.')
+  if (!source) errors.push('직접 대조한 네이버 지도 링크를 입력해 주세요.')
+  else if (!url || url.protocol !== 'https:' || !['map.naver.com', 'm.map.naver.com', 'naver.me'].includes(url.hostname))
+    errors.push('네이버 지도의 장소 링크나 공유 링크(naver.me)를 입력해 주세요.')
+  if (missing) errors.push(`대조 항목 ${missing}개가 체크되지 않았습니다.`)
+  if (errors.length || !url) throw Error(errors.join(' '))
   const p = structuredClone(current)
   p.review = {
     status: 'checked',
@@ -550,7 +567,7 @@ hook('review', async () => {
     evidence: { url: url.href, method: 'naver_map_visual', checks: verifiedChecks },
   }
   await modify(p)
-})
+}, 'review'))
 hook('backup', async () => {
   link(
     new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' }),

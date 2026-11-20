@@ -115,7 +115,7 @@
             <div class="row">
               <button id="backup">JSON 백업</button><button id="refresh">지금 다시 확인</button>
             </div>
-            <details>
+            <details id="review-panel">
               <summary>위치 대조 기록</summary>
               <p><a id="review-map" target="_blank" rel="noopener noreferrer">이 주소를 네이버 지도에서 열기</a></p>
               <label for="review-note">대조 방법과 관찰 내용</label
@@ -124,6 +124,7 @@
               ><input id="review-source" type="url" placeholder="https://map.naver.com/…" />
               <div id="review-checks"></div>
               <button id="review">대조 기록 저장</button>
+              <p id="review-status" role="status" aria-live="polite"></p>
             </details>
             <details>
               <summary>저장 데이터 관리</summary>
