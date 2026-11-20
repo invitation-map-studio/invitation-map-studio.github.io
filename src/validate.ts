@@ -48,7 +48,7 @@ export function importProject(raw: string): Project {
   )
     bad()
   const spec = record(p.spec, ['items', 'ink', 'layout', 'style'])
-  if (spec.style !== undefined && (spec.style !== 'vicinity' || spec.layout !== 'minimal')) bad()
+  if (spec.style !== undefined && (!choice(spec.style, 'vicinity', 'neighborhood') || spec.layout !== 'minimal')) bad()
   if (spec.layout !== undefined && spec.layout !== 'minimal') bad()
   if (!/^#[a-f\d]{6}$/i.test(spec.ink) || !Array.isArray(spec.items) || spec.items.length > 20000)
     bad()
@@ -116,8 +116,9 @@ export function importProject(raw: string): Project {
     )
       bad()
     for (const road of g.roads) {
-      const r = record(road, ['id', 'version', 'name', 'highway', 'level', 'nodes', 'points'])
+      const r = record(road, ['id', 'version', 'name', 'highway', 'level', 'nodes', 'points', 'oneWay'])
       if (
+        (r.oneWay !== undefined && typeof r.oneWay !== 'boolean') ||
         !nat(r.id) ||
         !nat(r.version) ||
         !str(r.name) ||
@@ -134,8 +135,8 @@ export function importProject(raw: string): Project {
       vertices += r.nodes.length
     }
     for (const lm of g.landmarks) {
-      const l = record(lm, ['id', 'version', 'name', 'point'])
-      if (!str(l.id) || !nat(l.version) || !str(l.name) || !point(l.point, true)) bad()
+      const l = record(lm, ['id', 'version', 'name', 'point', 'kind'])
+      if ((l.kind !== undefined && l.kind !== 'junction') || !str(l.id) || !nat(l.version) || !str(l.name) || !point(l.point, true)) bad()
     }
   } else if (p.geo !== null) bad()
   if (vertices > 100000) bad()

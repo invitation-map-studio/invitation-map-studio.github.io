@@ -3,10 +3,10 @@ import type { Place } from './model'
 import { mapScale } from './location-check'
 import { mapBounds } from './transit'
 
-export type Building = [id: string, name: string, lon: number, lat: number, priority: number]
+export type Building = [id: string, name: string, lon: number, lat: number, priority: number, kind?: 'shop' | 'stop']
 
 async function read(file: string, signal: AbortSignal) {
-  const response = await fetch(new URL('buildings/' + file, document.baseURI), { signal })
+  const response = await fetch(new URL('buildings/' + file + '?v=2', document.baseURI), { signal })
   if (!response.ok) throw Error('주변 건물 자료를 열 수 없습니다.')
   return response
 }

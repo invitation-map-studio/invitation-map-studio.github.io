@@ -355,7 +355,7 @@ let checkedRoads: { layer: RoadLayer; selected: LocalRoad[] } | undefined
 
 function addLocalRoads(p: Project, selected: LocalRoad[], street: string) {
   if (!p.geo) return false
-  const additions = localRoadItems(p.spec, p.geo.place, selected, street)
+  const additions = localRoadItems(p.spec, p.geo.place, selected, street, p.geo.roads)
   if (!additions.length) return false
   p.spec.items.unshift(...additions)
   p.review = pending()
@@ -400,7 +400,7 @@ function compareAccessRoads(layer: RoadLayer, address: string, point: Point) {
   if (!busy) void applyRoadCheck()
 }
 
-async function use(p: Project, message: string, previous?: Project | null) {
+async function use(p: Project, message: string, previous?: Project | null, arrange = false) {
   setProgress('work', '약도 불러오는 중')
   if (p.geo && !p.imported) {
     const guides = p.spec.items.filter(i => i.id.startsWith('transit-'))
@@ -408,8 +408,26 @@ async function use(p: Project, message: string, previous?: Project | null) {
     if (!guides.length || (!guides.some(i => i.id.startsWith('transit-exit-')) &&
         JSON.stringify(guides) === JSON.stringify(transitItems(p.geo.place, false)))) {
       p.spec.items = p.spec.items.filter(i => !i.id.startsWith('transit-'))
-      p.spec.items.push(...transitItems(p.geo.place, true, p.spec.style === 'vicinity'))
+      p.spec.items.push(...transitItems(p.geo.place, true, Boolean(p.spec.style)))
       p.spec.items.push(...exitLabels(p.spec.items, p.geo.place))
+    }
+  }
+  let nextLayer: RoadLayer | undefined
+  let messageRoad = ''
+  if (p.geo && !p.imported && p.spec.layout === 'minimal') {
+    const signal = AbortSignal.timeout(7500)
+    try {
+      const roads = await localRoadsNear(p.geo.place, busy ? AbortSignal.any([busy.signal, signal]) : signal)
+      const street = parseRoadAddress(p.address).street
+      nextLayer = {id: p.id, roads, street}
+      if (arrange) {
+        const footer = p.spec.items.filter(item => item.footer)
+        const drawing = layout(p.geo, p.name, roads)
+        drawing.items = [...drawing.items.filter(item => !item.footer), ...footer]
+        p.spec = drawing
+      } else addLocalRoads(p, selectLocalRoads(p.spec, p.geo.place, roads, street), street)
+    } catch {
+      messageRoad = '골목·보행로 자료를 읽지 못했습니다. 약도를 다시 열면 재시도합니다.'
     }
   }
   if (p.geo && !p.imported && p.spec.layout === 'minimal' &&
@@ -427,19 +445,6 @@ async function use(p: Project, message: string, previous?: Project | null) {
       } else p.spec.items.push(...additions)
     } else if (prior) {
       p.spec.items.push(...prior.spec.items.filter(i => i.id.startsWith('building-')))
-    }
-  }
-  let nextLayer: RoadLayer | undefined
-  let messageRoad = ''
-  if (p.geo && !p.imported && p.spec.layout === 'minimal') {
-    const signal = AbortSignal.timeout(7500)
-    try {
-      const roads = await localRoadsNear(p.geo.place, busy ? AbortSignal.any([busy.signal, signal]) : signal)
-      const street = parseRoadAddress(p.address).street
-      nextLayer = {id: p.id, roads, street}
-      addLocalRoads(p, selectLocalRoads(p.spec, p.geo.place, roads, street), street)
-    } catch {
-      messageRoad = '골목·보행로 자료를 읽지 못했습니다. 약도를 다시 열면 재시도합니다.'
     }
   }
   busy?.signal.throwIfAborted()
@@ -488,7 +493,7 @@ function revised(old: Project, geo: Geography, name: string): Project {
 async function make(place: Place, name: string, force: boolean, signal: AbortSignal, details = '') {
   const footer = current.spec.items.find((item) => item.id === 'details')
   let old =
-    current.geo && (!searching || current.spec.style === 'vicinity') &&
+    current.geo && (!searching || current.spec.style === 'neighborhood') &&
     placeKey(current.geo.place) === placeKey(place) &&
     current.name === name &&
     (!searching || (footer?.kind === 'text' && footer.text === details))
@@ -521,7 +526,7 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
           : changed
             ? '갱신 완료 · 변경된 지리 자료를 새 버전으로 저장했습니다.'
             : '갱신 완료',
-      changed ? old : undefined,
+      changed ? old : undefined, !old,
     )
   }
   if (!force) {
@@ -614,7 +619,7 @@ async function searchAddress(address: string, name: string, details: string, sig
         const landmarks = await buildingsNear(frame)
         signal.throwIfAborted()
         const key = (value: string) => normalize(value).replace(/\s/g, '').toLowerCase()
-        list = landmarks.filter(([, label, x, y]) => key(label) === key(name) &&
+        list = landmarks.filter(([, label, x, y, , kind]) => !kind && key(label) === key(name) &&
           Math.hypot((x - lon) * Math.cos(lat * Math.PI / 180), y - lat) * 111320 <= 100)
           .map(([id, label, x, y]) => ({ ...frame, id, lon: x, lat: y, venueName: label, entrance: 'named-landmark' }))
       }
@@ -741,7 +746,7 @@ hook('dasan20', () =>
   ),
 )
 hook('dasan74', () =>
-  use(sample74(), '공식 단지 주소와 OSM 경계를 대조한 보관본입니다. 표식은 단지 중심을 가리킵니다.'),
+  use(sample74(), '공식 단지 주소와 OSM 경계를 대조한 보관본입니다. 표식은 단지 중심을 가리킵니다.', undefined, true),
 )
 sel('element').onchange = () => {
   selected = sel('element').value
@@ -1007,6 +1012,7 @@ el('unlock').onsubmit = async (e) => {
       list.length
         ? '최근 프로젝트를 열었습니다.'
         : '다산74 보관본 · 단지 중심을 기준으로 생성한 약도입니다.',
+      undefined, !list.length,
     )
     el('gate').hidden = true
     el('studio').hidden = false

@@ -147,8 +147,8 @@ test('근거리 약도는 가까운 출구 이름을 도면에 남기고 먼 역
   place.radius = stationRadius(place)
   assert.equal(place.radius, 155)
   const map = layout({ source: 'osm', place, roads: [], landmarks: [] }, '예식장')
-  assert.equal(map.style, 'vicinity')
-  assert.ok(map.items.some(i => i.id === 'transit-exit-A' && i.kind === 'text' && i.text === '청담역 12번 출구'))
+  assert.equal(map.style, 'neighborhood')
+  assert.deepEqual(map.items.filter(i => ['transit-exit-A','transit-number-A'].includes(i.id)).map(i => i.kind === 'text' && i.text), ['청담역','12번 출구'])
   assert.ok(!map.items.some(i => i.id === 'transit-guide-B'))
 
   const suburban = { ...fixture.geo.place, radius: 1500 }

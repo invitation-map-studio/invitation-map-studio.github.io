@@ -107,7 +107,8 @@ export async function seedGeography(geo: Geography, fetchedAt: string) {
   const request = store.get(key)
   request.onsuccess = () => {
     const prior = request.result as Snapshot | undefined
-    if (!prior || prior.lastSuccessfulFetchAt < fetchedAt) store.put(snap, key)
+    if (!prior || prior.lastSuccessfulFetchAt < fetchedAt ||
+        (prior.lastSuccessfulFetchAt === fetchedAt && prior.hash !== snap.hash)) store.put(snap, key)
   }
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve()

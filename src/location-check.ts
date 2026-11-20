@@ -35,7 +35,7 @@ export function localLocationCheck(project: Project) {
   try { street = parseRoadAddress(project.address).street } catch { /* older free-form address */ }
   const roads = new Set(project.geo.roads.filter(r => r.name === street).map(r => String(r.id)))
   const onMap = project.spec.items.some(i =>
-    i.kind === 'line' && !i.hidden && (i.id.startsWith('local-addr-') || roads.has(/^road-(\d+)-\d+$/.exec(i.id)?.[1] ?? '')))
+    i.kind === 'line' && !i.hidden && (i.id.startsWith('local-addr-') || roads.has(/^road-(\d+)-\d+(?:-center)?$/.exec(i.id)?.[1] ?? '')))
   if (street) parts.push(street + (onMap ? ' 도로 표시 확인' : ' 도로 표시 확인 필요'))
   if (marker) {
     const offset = distanceMeters(marker, [place.lon, place.lat])

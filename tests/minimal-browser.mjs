@@ -52,12 +52,16 @@ try {
     assert.ok(await paper.locator('[data-item="destination"] path').count())
     assert.equal(await paper.locator('[data-item^="dot-"],[data-item^="label-"]').count(),0)
     const buildings = await paper.locator('[data-item^="building-name-"]').allTextContents()
-    assert.ok(buildings.length >= 2 && buildings.length <= 4, JSON.stringify(buildings))
+    assert.ok(buildings.length >= 2 && buildings.length <= 6, JSON.stringify(buildings))
     assert.equal(await paper.locator('rect[data-item^="building-mark-"]').count(), buildings.length)
     assert.equal(new Set(buildings).size, buildings.length)
     assert.match(await paper.textContent(),new RegExp(station))
     if (slug === 'cheongdam') {
-      assert.equal(await paper.locator('[data-item="transit-exit-A"]').textContent(), station)
+      assert.ok(await paper.locator('path[data-item$="-center"]').count() >= 2)
+      assert.match(await paper.locator('[data-item^="crossing-name-"]').first().textContent(), /경기고교앞/)
+      assert.ok(await paper.locator('[data-item^="local-street-name"]').count() >= 2)
+      const caption = await paper.locator('[data-item="transit-exit-A"],[data-item="transit-number-A"]').allTextContents()
+      assert.equal(caption.join(' '), station)
       assert.match(await paper.locator('[data-item="transit-guide-A"]').textContent(), /청담역 12번 출구.*7호선.*직선 약 40m/)
     }
     await page.locator('#download').click()

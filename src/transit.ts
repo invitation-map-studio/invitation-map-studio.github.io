@@ -75,10 +75,11 @@ export function transitItems(place: Place, numbered = true, vicinity = false): I
       if (numbered && !stop.name.endsWith('번 출구')) parts.push('역 대표점 기준')
       parts.push('직선 약 ' + Math.round(meters / 10) * 10 + 'm')
     }
-    if (!inMap) {
+    if (!inMap || (vicinity && !stop.directions && Math.hypot(x - axes.cx, y - axes.cy) * place.radius / 440 >= 20)) {
       const directions = ['동', '북동', '북', '북서', '서', '남서', '남', '남동']
       const octant = Math.round(Math.atan2(axes.cy - y, x - axes.cx) / (Math.PI / 4))
-      parts.push('지도 밖 ' + directions[(8 + octant) % 8] + '쪽')
+      parts.push(inMap ? '목적지는 ' + directions[(12 + octant) % 8] + '쪽' :
+        '지도 밖 ' + directions[(8 + octant) % 8] + '쪽')
     }
     items.push(label('transit-guide-' + key, parts.join('  ·  '), 700, 1085 + i * 38, 26, {font:'sans'}))
   }

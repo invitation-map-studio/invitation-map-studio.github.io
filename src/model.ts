@@ -19,7 +19,7 @@ export type Item = { id: string; tone: Tone; footer: boolean; hidden: boolean } 
 )
 export interface Spec {
   layout?: 'minimal'
-  style?: 'vicinity'
+  style?: 'vicinity' | 'neighborhood'
   items: Item[]
   ink: string
 }
@@ -37,10 +37,12 @@ export interface Road {
   name: string
   highway: string
   level: string
+  oneWay?: boolean
   nodes: number[]
   points: Point[]
 }
 export interface Landmark {
+  kind?: 'junction'
   id: string
   version: number
   name: string

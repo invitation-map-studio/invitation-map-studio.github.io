@@ -47,7 +47,9 @@ for obj in reader:
             name = brand
     if obj.is_node() and (name.startswith(('(주)', '㈜', '주식회사')) or t.get('indoor') or t.get('level')):
         continue
-    rank = priority(t)
+    kind = ('stop' if t.get('highway') == 'bus_stop' else
+            'shop' if t.get('shop') == 'convenience' else None)
+    rank = 2 if kind else priority(t)
     if rank is None or len(name) < 2 or len(name) > 48 or name.isdecimal():
         continue
     if obj.is_node():
@@ -63,7 +65,10 @@ for obj in reader:
         xs, ys = zip(*points)
         lon, lat = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
         ref = ('way/' if obj.from_way() else 'relation/') + str(obj.orig_id())
-    tiles[f'{math.floor(lon*4)}-{math.floor(lat*4)}'].append([ref, name, round(lon, 7), round(lat, 7), rank])
+    row = [ref, name, round(lon, 7), round(lat, 7), rank]
+    if kind:
+        row.append(kind)
+    tiles[f'{math.floor(lon*4)}-{math.floor(lat*4)}'].append(row)
 
 output.mkdir(parents=True, exist_ok=True)
 for key, rows in tiles.items():

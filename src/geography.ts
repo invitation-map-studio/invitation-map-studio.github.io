@@ -1,3 +1,4 @@
+import { streetCenterline, type StreetPath } from './carriageways'
 import type { LocalRoad } from './local-roads'
 import type { Building } from './buildings'
 import { mapBounds, stationsFor, transitItems } from './transit'
@@ -211,7 +212,7 @@ export async function fetchGeography(place: Place, signal: AbortSignal, minimal 
   }
   const around = `(around:${Math.ceil(place.radius * 1.76)},${place.lat},${place.lon})`
   const rows = await query(
-    minimal ? `way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"]${around};out meta geom;` :
+    minimal ? `(way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"]${around};node["name"]["highway"="traffic_signals"]${around};);out meta geom;` :
     `(way["highway"~"^(motorway|primary|secondary|tertiary|trunk|residential|unclassified|service|living_street|road|primary_link|secondary_link|tertiary_link|trunk_link)$"]${around};nwr["name"]["amenity"~"^(school|library|community_centre)$"]${around};node["name"]["highway"="bus_stop"]${around};node["name"]["railway"="station"]${around};);out meta geom;`,
     signal,
   )
@@ -238,6 +239,7 @@ export async function fetchGeography(place: Place, signal: AbortSignal, minimal 
         name,
         highway: t.highway,
         level: [t.layer, t.bridge, t.tunnel].map((s) => s ?? '').join('/'),
+        ...(['yes', 'true', '1'].includes(t.oneway) ? {oneWay: true} : {}),
         nodes: e.nodes,
         points: e.geometry.map((p) => [p.lon, p.lat]),
       })
@@ -256,6 +258,7 @@ export async function fetchGeography(place: Place, signal: AbortSignal, minimal 
           id: e.type + '/' + e.id,
           version: e.version,
           name,
+          ...(t.highway === 'traffic_signals' ? {kind:'junction' as const} : {}),
           point: [center.lon!, center.lat!],
         })
     }
@@ -418,13 +421,32 @@ function obstacles(items: Item[]) {
 
 // Place the exit name on the map when space permits. The guide below the map
 // always includes the full name, including at crowded junctions.
-export function exitLabels(items: Item[], place: Place, streets: Segment[] = []): Item[] {
+export function exitLabels(items: Item[], place: Place, streets: Segment[] = [], stacked = false): Item[] {
   const { occupied, segments } = obstacles(items)
   const result: Item[] = []
   for (const [index, stop] of stationsFor(place).entries()) {
     const key = String.fromCharCode(65 + index)
     const marker = items.find(i => i.id === 'transit-stop-' + key)
     if (marker?.kind !== 'dot' || marker.hidden) continue
+    const numbered = stacked && /^(.+역) (.+번 출구)$/.exec(stop.name)
+    if (numbered) {
+      const station = numbered[1], exit = numbered[2]
+      const width = Math.max(textWidth(station, 28), textWidth(exit, 23))
+      const side = width/2 + marker.radius + 18
+      let placed = false
+      for (const [dx,dy] of [[-side,-6],[side,-6],[0,48],[0,-52],[-side,-36],[side,-36],[-side,26],[side,26]]) {
+        const x = marker.x+dx, y = marker.y+dy
+        const upper = placement(station,28,x,y,0,streets,occupied)
+        const lower = placement(exit,23,x,y+31,0,streets,occupied)
+        if (!upper || !lower) continue
+        result.push(label('transit-exit-'+key,station,x,y,28,{weight:700}),
+          label('transit-number-'+key,exit,x,y+31,23,{font:'sans'}))
+        occupied.push(upper.bounds,lower.bounds)
+        placed = true
+        break
+      }
+      if (placed) continue
+    }
     const size = 25, half = textWidth(stop.name, size) / 2
     const offsets = [[-half-23, 8], [half+23, 8], [0, -24], [0, 53],
       [-half/2, 53], [half/2, 53], [-half/2, -24], [half/2, -24],
@@ -455,16 +477,19 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
   const axes = mapScale(place)
   const normalizeName = (name: string) => name.replace(/\s+/g, '').toLowerCase()
   const venueName = normalizeName(venue)
-  const candidates = buildings.map(([id, name, lon, lat, rank]) => {
+  const candidates = buildings.map(([id, rawName, lon, lat, rank, kind]) => {
     const point: Point = [axes.cx + (lon - place.lon) * axes.x, axes.cy - (lat - place.lat) * axes.y]
     const meters = distance(point, [axes.cx, axes.cy]) * place.radius / 440
-    return { id, name, point, key: normalizeName(name), score: meters + rank * 90 }
+    const name = kind === 'stop' ? rawName.replace(/[.]/g,'·') + ' 정류장' : rawName
+    return { id, name, kind, meters, point, key: normalizeName(name), score: meters + rank * 40 }
   }).sort((a, b) => a.score - b.score || a.id.localeCompare(b.id))
   const result: Item[] = []
   const names = new Set<string>()
   const marked: Point[] = []
   const size = 24
-  for (const { id, name, point, key } of candidates) {
+  const extras = new Set<string>()
+  for (const { id, name, point, key, kind, meters } of candidates) {
+    if (kind && (spec.style !== 'neighborhood' || extras.has(kind) || meters > (kind === 'shop' ? 110 : 145))) continue
     if (id === place.id || names.has(key) || key === venueName ||
         (venueName.length >= 4 && key.includes(venueName))) continue
     const [x, y] = point
@@ -475,7 +500,9 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
     const beside = textWidth(name, size) / 2 + 14
     const shift = textWidth(name, size) / 3
     for (const [dx, dy] of [[beside, 9], [-beside, 9], [0, -15], [0, 39],
-      [-shift, -15], [shift, -15], [-shift, 39], [shift, 39]]) {
+      [-shift, -15], [shift, -15], [-shift, 39], [shift, 39],
+      [beside,-12],[-beside,-12],[beside,30],[-beside,30],[0,-32],[0,52],
+      [-shift,-32],[shift,-32],[-shift,52],[shift,52]]) {
       const position = placement(name, size, x + dx, y + dy, 0, segments, [...occupied, mark])
       if (!position) continue
       result.push(
@@ -483,11 +510,19 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
         { ...label('building-name-' + id, name, position.x, position.y, size, { font: 'sans' }), tone: 'soft' },
       )
       names.add(key)
+      if (kind) extras.add(kind)
       marked.push(point)
       occupied.push(mark, position.bounds)
       break
     }
-    if (marked.length === 4) break
+    if (marked.length === (spec.style === 'neighborhood' ? 6 : 4)) break
+  }
+  if (spec.style === 'neighborhood' && !spec.items.some(i => i.id === 'transit-guide-B' || i.id === 'building-bus-guide')) {
+    const nearest = candidates.filter(p => p.kind === 'stop' && p.meters <= 180)
+      .sort((a,b) => a.meters - b.meters)[0]
+    if (nearest) result.push(label('building-bus-guide',
+      nearest.name + '  ·  목적지까지 직선 약 ' + Math.round(nearest.meters/10)*10 + 'm',
+      700, spec.items.some(i => i.id === 'transit-guide-A') ? 1123 : 1085, 24, {font:'sans'}))
   }
   return result
 }
@@ -540,21 +575,66 @@ export function selectLocalRoads(spec: Spec, place: Place, roads: LocalRoad[], s
     take(ranked.filter(r => !r.road.foot && r.meters <= 95), 1)
     take(ranked.filter(r => r.road.foot && r.meters <= 65), 1)
   }
+  if (spec.style === 'neighborhood' && !reference) {
+    const names = new Map<string, {road: LocalRoad; meters: number}[]>()
+    for (const road of roads) {
+      if (road.foot || !road.name) continue
+      let meters = Infinity
+      for (let i=1; i<road.points.length; i++) for (const anchor of anchors)
+        meters = Math.min(meters, distanceToLine(anchor, road.points[i-1], road.points[i]) / scale)
+      if (meters > 115) continue
+      const list = names.get(road.name) ?? []
+      list.push({road, meters})
+      names.set(road.name, list)
+    }
+    const streets = [...names.values()].map(list => list.sort((a,b) => a.meters-b.meters))
+      .sort((a,b) => a[0].meters-b[0].meters)
+    for (const group of streets.slice(0,3)) for (const {road} of group.slice(0,3))
+      selected.set(road.id, road)
+  }
   return [...selected.values()]
 }
 
-export function localRoadItems(spec: Spec, place: Place, roads: LocalRoad[], street: string): Item[] {
+export function localRoadItems(spec: Spec, place: Place, roads: LocalRoad[], street: string, major: Road[] = []): Item[] {
   const scale = 440 / place.radius
   const drawn = new Set(spec.items.map(i =>
     /^(?:road-|local-(?:addr-)?(?:foot|lane)-)(\d+)-/.exec(i.id)?.[1]))
   const { occupied, segments } = obstacles(spec.items)
   const additions: Item[] = []
-  const named: Segment[] = []
+  const named = new Map<string, Segment[]>()
+  // Snap a side street to a schematic centreline only at an actual shared OSM node.
+  const axes = mapScale(place)
+  const centerItems = spec.items.filter(i => i.kind === 'line' && i.id.endsWith('-center'))
+  const centerAt = new Map<string, Segment[]>()
+  for (const item of centerItems) {
+    if (item.kind !== 'line') continue
+    const source = major.find(r => r.id === Number(item.id.split('-')[1]))
+    if (!source) continue
+    const pieces = obstacles([item]).segments
+    for (const road of major) if (road.oneWay && road.name === source.name && road.level === source.level) {
+      for (const [x,y] of road.points) {
+        const key = Math.round(x*1e6) + ',' + Math.round(y*1e6)
+        centerAt.set(key, (centerAt.get(key) ?? []).concat(pieces))
+      }
+    }
+  }
+  function attach(p: Point): Point {
+    const lon = place.lon + (p[0]-axes.cx)/axes.x, lat = place.lat - (p[1]-axes.cy)/axes.y
+    const pieces = centerAt.get(Math.round(lon*1e6) + ',' + Math.round(lat*1e6))
+    let best = p, limit = 25*scale
+    for (const seg of pieces ?? []) {
+      const dx = seg.b[0]-seg.a[0], dy = seg.b[1]-seg.a[1]
+      const t = Math.max(0, Math.min(1, ((p[0]-seg.a[0])*dx + (p[1]-seg.a[1])*dy) / (dx*dx+dy*dy || 1)))
+      const q: Point = [seg.a[0]+t*dx,seg.a[1]+t*dy]
+      if (distance(p,q)<limit) { best=q; limit=distance(p,q) }
+    }
+    return best
+  }
   for (const road of roads) {
     if (drawn.has(String(road.id))) continue
     const addr = street !== '' && road.name === street
     const key = 'local-' + (addr ? 'addr-' : '') + (road.foot ? 'foot-' : 'lane-') + road.id + '-'
-    const points = simplify(road.points, [], new Set(), 2 * scale)
+    const points = simplify(centerAt.size ? road.points.map(attach) : road.points, [], new Set(), 2 * scale)
     let run: Point[] = [], section = 0
     for (let i = 1; i < points.length; i++) {
       for (const [a,b] of clearSegments(points[i-1], points[i], occupied)) {
@@ -566,24 +646,37 @@ export function localRoadItems(spec: Spec, place: Place, roads: LocalRoad[], str
         run.push(b)
         const segment = { a, b, length: distance(a,b), bounds: envelope([a,b]) }
         segments.push(segment)
-        if (addr) named.push(segment)
+        if (addr || (spec.style === 'neighborhood' && road.name)) {
+          const list = named.get(road.name) ?? []
+          list.push(segment)
+          named.set(road.name, list)
+        }
       }
     }
   }
-  if (named.length && !spec.items.some(i => i.kind === 'text' && (i.text === street || i.id === 'local-street-name'))) {
-    for (const seg of named.sort((a,b) => b.length-a.length)) {
-      let angle = Math.atan2(seg.b[1]-seg.a[1], seg.b[0]-seg.a[0]) * 180 / Math.PI
-      if (angle > 90) angle -= 180
-      if (angle < -90) angle += 180
-      const rad = angle * Math.PI/180
-      for (const fraction of [.5,.3,.7]) for (const offset of [-14,32,-29,45]) {
-        const x = seg.a[0] + (seg.b[0]-seg.a[0])*fraction - Math.sin(rad)*offset
-        const y = seg.a[1] + (seg.b[1]-seg.a[1])*fraction + Math.cos(rad)*offset
-        if (placement(street, 22, x, y, angle, segments, occupied)) {
-          additions.push(label('local-street-name', street, x, y, 22, {font:'sans', angle}))
-          return additions
+  let labelCount = spec.items.filter(i => i.id.startsWith('local-street-name')).length
+  const streetNames = [...named.keys()].sort((a,b) => Number(b === street) - Number(a === street))
+  for (const name of streetNames) {
+    if (labelCount >= 3 || spec.items.some(i => i.kind === 'text' && i.text === name)) continue
+    let chosen: Placement | undefined
+    for (const seg of named.get(name)!.sort((a,b) => b.length-a.length)) {
+      if (seg.length < 52) continue
+      for (const f of [.5,.25,.75]) {
+        const x=seg.a[0]+(seg.b[0]-seg.a[0])*f, y=seg.a[1]+(seg.b[1]-seg.a[1])*f
+        const side = textWidth(name,22)/2 + 12
+        for (const [dx,dy] of [[0,-12],[0,32],[-side,7],[side,7],[-side,-12],[side,32]]) {
+          chosen=placement(name,22,x+dx,y+dy,0,segments,occupied)
+          if (chosen) break
         }
+        if (chosen) break
       }
+      if (chosen) break
+    }
+    if (chosen) {
+      const id = name === street ? 'local-street-name' : 'local-street-name-' + name
+      additions.push(label(id, name, chosen.x, chosen.y, 22, {font:'sans'}))
+      occupied.push(chosen.bounds)
+      labelCount++
     }
   }
   return additions
@@ -591,7 +684,7 @@ export function localRoadItems(spec: Spec, place: Place, roads: LocalRoad[], str
 
 const majorRoads = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
 
-export function layout(geo: Geography, name: string): Spec {
+export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): Spec {
   const { place } = geo,
     scale = 440 / place.radius
   const axes = mapScale(place)
@@ -625,24 +718,63 @@ export function layout(geo: Geography, name: string): Spec {
   const destination: Item = { ...baseItem('destination'), kind: 'flower', x: 700, y: 605, radius: 28 }
   // Reserve station captions before drawing the street network or placing other names.
   const streetsForLabels: Segment[] = []
-  const simplified = roads.map(road => {
-    const points = simplify(road.points.map(project), road.nodes, junctions, 10 * scale)
-    for (let i = 1; i < points.length; i++) {
-      const a = points[i - 1], b = points[i]
-      if (clip(a, b).length) streetsForLabels.push({ a, b, length: distance(a, b), bounds: envelope([a, b]) })
+  const groups = new Map<string, StreetPath[]>()
+  for (const road of roads) {
+    const path = { road, points: simplify(road.points.map(project), road.nodes, junctions, 4 * scale) }
+    const key = road.name ? JSON.stringify([road.name, road.level]) : String(road.id)
+    const group = groups.get(key) ?? []
+    group.push(path)
+    groups.set(key, group)
+  }
+  const simplified: StreetPath[] = []
+  const pad = 50 * scale
+  const extended: Rect = [box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad]
+  for (const paths of groups.values()) {
+    let center
+    const divided = paths.filter(p => p.road.oneWay && p.road.name)
+    const undivided = paths.filter(p => !p.road.oneWay || !p.road.name)
+    if (divided.length > 1) {
+      const edges = divided.flatMap(({points}) => points.slice(1).flatMap((p,i) => {
+        const [a,b] = clip(points[i], p, extended)
+        return a && distance(a,b) > .1 ? [{a,b,length:distance(a,b)}] : []
+      }))
+      center = streetCenterline(edges, scale)
     }
-    return { road, points }
-  })
-  const exits = exitLabels([destination, ...transit], place, streetsForLabels)
+    if (center) {
+      const endNodes = new Set(divided.flatMap(p => [p.road.nodes[0],p.road.nodes.at(-1)!]))
+      for (const {road} of undivided) for (const i of [0,road.nodes.length-1]) {
+        if (!endNodes.has(road.nodes[i])) continue
+        const point = project(road.points[i])
+        for (const j of [0,center.length-1])
+          if (distance(point,center[j]) < 45*scale) center[j] = point
+      }
+      simplified.push({road: divided[0].road, points: simplify(center, [], new Set(), 3 * scale), center:true}, ...undivided)
+    } else simplified.push(...paths)
+  }
+  for (const {points} of simplified) for (let i=1; i<points.length; i++) {
+    const a = points[i-1], b = points[i]
+    if (clip(a,b).length) streetsForLabels.push({a,b,length:distance(a,b),bounds:envelope([a,b])})
+  }
+  let addressStreet = ''
+  if (nearby.length) {
+    try { addressStreet = parseRoadAddress(place.address).street } catch { /* Legacy free-form address. */ }
+  }
+  const spec: Spec = {layout:'minimal', style:'neighborhood', ink:'#282626', items}
+  const access = selectLocalRoads({...spec, items:transit}, place, nearby, addressStreet)
+  for (const road of access) for (let i=1; i<road.points.length; i++) {
+    const [a,b] = clip(road.points[i-1], road.points[i])
+    if (a) segments.push({a,b,length:distance(a,b),bounds:envelope([a,b])})
+  }
+  const exits = exitLabels([destination, ...transit], place, [...streetsForLabels,...segments], true)
   const captions = obstacles(exits).occupied
-  for (const { road, points } of simplified) {
+  for (const { road, points, center } of simplified) {
     let run: Point[] = [],
       section = 0
     function flush() {
       if (run.length > 1) {
         const width = ['motorway', 'trunk', 'primary'].includes(road.highway) ? 3.2 : 2.3
         items.push({
-          ...baseItem('road-' + road.id + '-' + section++, 'soft'),
+          ...baseItem('road-' + road.id + '-' + section++ + (center ? '-center' : ''), 'soft'),
           kind: 'line',
           width,
           points: run,
@@ -677,17 +809,49 @@ export function layout(geo: Geography, name: string): Spec {
   }
   // Mark a divided intersection once at invitation scale.
   const marked: Point[] = []
-  crossings.sort((a, b) => b.mainStreets.size - a.mainStreets.size ||
+  const namedNodes = new Map(geo.landmarks.filter(l => l.kind === 'junction').map(l => [l.id, l.name]))
+  const usedJunctionNames = new Set<string>()
+  crossings.sort((a, b) => Number(namedNodes.has('node/' + b.id)) - Number(namedNodes.has('node/' + a.id)) || b.mainStreets.size - a.mainStreets.size ||
     distance(a.point, [700, 605]) - distance(b.point, [700, 605]) || a.id - b.id)
   for (const crossing of crossings) {
-    const [x, y] = crossing.point
+    const title = namedNodes.get('node/' + crossing.id)
+    if (title && usedJunctionNames.has(title)) continue
+    let at = crossing.point
+    const [first, second] = [...crossing.mainStreets]
+    // Locate the same physical junction on the two printed street axes.
+    if (first && second) {
+      let closest = 45 * scale
+      for (const a of streets.get(first)?.parts ?? []) for (const b of streets.get(second)?.parts ?? []) {
+        const dx=a.b[0]-a.a[0], dy=a.b[1]-a.a[1], ex=b.b[0]-b.a[0], ey=b.b[1]-b.a[1]
+        const det=dx*ey-dy*ex
+        if (Math.abs(det)<.001) continue
+        const x=b.a[0]-a.a[0], y=b.a[1]-a.a[1], t=(x*ey-y*ex)/det, u=(x*dy-y*dx)/det
+        if (t<-.001 || t>1.001 || u<-.001 || u>1.001) continue
+        const point: Point=[a.a[0]+t*dx,a.a[1]+t*dy]
+        const d=distance(point,crossing.point)
+        if (d<closest) { closest=d; at=point }
+      }
+    }
+    const [x, y] = at
     const bounds: Rect = [x - 8, y - 8, x + 8, y + 8]
     if (!inside([bounds[0], bounds[1]]) || !inside([bounds[2], bounds[3]]) ||
         occupied.some(rect => overlap(bounds, rect)) ||
-        marked.some(p => distance(p, crossing.point) < 55)) continue
+        marked.some(p => distance(p, at) < 55)) continue
     items.push({ ...baseItem('junction-' + crossing.id), kind: 'dot', x, y, radius: 3.5 })
     occupied.push(bounds)
-    marked.push(crossing.point)
+    marked.push(at)
+    if (title) {
+      usedJunctionNames.add(title)
+      const caption = /(거리|교차로|로터리|분기점)$/.test(title) ? title : title + ' 교차로'
+      const side = textWidth(caption, 25)/2 + 15
+      for (const [dx,dy] of [[side,-12],[-side,-12],[side,32],[-side,32],[0,-25],[0,46],[-side,-35],[side,-35],[-side,65],[side,65],[-side,-65],[side,-65],[-side,95],[side,95]]) {
+        const pos = placement(caption,25,x+dx,y+dy,0,segments,occupied)
+        if (!pos) continue
+        items.push(label('crossing-name-' + crossing.id,caption,pos.x,pos.y,25,{font:'sans'}))
+        occupied.push(pos.bounds)
+        break
+      }
+    }
     if (marked.length === 2) break
   }
   items.push(destination)
@@ -706,6 +870,10 @@ export function layout(geo: Geography, name: string): Spec {
     [34, -64],
     [0, -95],
     [0, 125],
+    [-beside, 49],
+    [beside, 49],
+    [-beside, -52],
+    [beside, -52],
     [-75, -60],
     [75, -60],
   ]) {
@@ -773,13 +941,13 @@ export function layout(geo: Geography, name: string): Spec {
       for (const fraction of [0.5, 0.32, 0.68]) {
         const x = seg.a[0] + (seg.b[0] - seg.a[0]) * fraction,
           y = seg.a[1] + (seg.b[1] - seg.a[1]) * fraction
-        for (const offset of [-14, 38, -25, 49]) {
+        for (const offset of [-18, 38, -32, 52, -textWidth(street.text,25)/2-15, textWidth(street.text,25)/2+15]) {
           chosen = placement(
             street.text,
             25,
             x - Math.sin(theta) * offset,
             y + Math.cos(theta) * offset,
-            angle,
+            0,
             segments,
             occupied,
           )
@@ -817,5 +985,6 @@ export function layout(geo: Geography, name: string): Spec {
     { ...label('details', '', 700, 1320, 27), footer: true },
     { ...label('parking', '', 700, 1374, 25, { font: 'sans' }), footer: true },
   )
-  return { layout: 'minimal', style: 'vicinity', ink: '#282626', items }
+  items.unshift(...localRoadItems(spec, place, access, addressStreet, roads))
+  return spec
 }

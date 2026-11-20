@@ -85,7 +85,7 @@ export function render(project: Project, mapOnly = false, interactive = false) {
                 : '확인 필요 시안 · 출입구 미확인',
           }
         : item,
-      project.spec.ink, project.spec.style === 'vicinity',
+      project.spec.ink, Boolean(project.spec.style),
     )
     if (interactive) el.setAttribute('data-item', item.id)
     root.append(el)
