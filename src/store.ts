@@ -129,6 +129,7 @@ export function resolvePlace(
         force && before?.lastSuccessfulFetchAt === previous?.lastSuccessfulFetchAt,
         fetcher,
       )
+      signal?.throwIfAborted()
       if (result.state !== 'failed') await put('geo', key, result.snap)
       return result
     })

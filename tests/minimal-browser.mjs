@@ -17,8 +17,13 @@ try {
   const page = await browser.newPage()
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
+  let releaseRoads
   if (local) {
-    await page.route('https://overpass-api.de/**', r => r.fulfill({ status: 429 }))
+    const delayed = new Promise(resolve => { releaseRoads = resolve })
+    await page.route('https://overpass-api.de/**', async r => {
+      await delayed
+      await r.fulfill({ status: 429 }).catch(() => {})
+    })
     await page.route('https://oapi.map.naver.com/**', r => r.fulfill({contentType:'text/javascript',body:`
       window.requests = 0
       window.naver = {maps:{LatLng:class {},Map:class {destroy(){}},Marker:class {setMap(){}},
@@ -47,6 +52,7 @@ try {
     await link.waitFor({timeout:120000})
     const waitDownload = page.waitForEvent('download')
     await link.click()
+    if (local) releaseRoads()
     const files = unzipSync(readFileSync(await (await waitDownload).path()))
     const find = ext => Object.keys(files).find(k => k.endsWith(ext))
     const svg = strFromU8(files[find('Editable.svg')])

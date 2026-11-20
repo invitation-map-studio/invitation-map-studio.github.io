@@ -27,6 +27,7 @@ import {
   projects,
   readArchive,
   resolvePlace,
+  type FetchOutcome,
   save,
   savedGeography,
   seedGeography,
@@ -94,6 +95,10 @@ let current: Project,
   busy: AbortController | null = null
 let urls: string[] = []
 let searching = false
+let backgroundRoads: AbortController | undefined
+let interactions = 0
+for (const event of ['pointerdown', 'keydown', 'input'])
+  el('studio').addEventListener(event, () => { interactions++ }, { capture: true })
 function status(message: string, error = false, id = searching ? 'search-status' : 'status') {
   const output = el(id)
   output.textContent = message
@@ -168,6 +173,7 @@ function searchAction(fn: (signal: AbortSignal) => Promise<void>) {
 }
 el('cancel').onclick = el('search-cancel').onclick = () => busy?.abort()
 function clearSearch() {
+  backgroundRoads?.abort()
   el('search-preview').hidden = true
   el('search-status').textContent = ''
   el('candidates').replaceChildren()
@@ -340,6 +346,26 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
       void checkWithNaver()
     }
   }
+  async function displaySnapshot(result: FetchOutcome) {
+    const { snap, state } = result,
+      changed = old && JSON.stringify(old.geo) !== JSON.stringify(snap.geo)
+    const p =
+      old && changed ? revised(old, snap.geo, name) : (old ?? createProject(snap.geo, name, details))
+    p.lastSuccessfulFetchAt = snap.lastSuccessfulFetchAt
+    p.expiresAt = snap.expiresAt
+    p.imported = false
+    p.refreshFailed = state === 'failed'
+    await use(
+      p,
+      state === 'failed'
+        ? '이전 조회본 · 갱신 실패. ' + result.error
+        : state === 'reused'
+          ? '저장본 재사용 · 외부 조회를 생략했습니다.'
+          : changed
+            ? '갱신 완료 · 변경된 지리 자료를 새 버전으로 저장했습니다.'
+            : '갱신 완료',
+    )
+  }
   if (searching) {
     const stored = await savedGeography(place)
     signal.throwIfAborted()
@@ -349,8 +375,35 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
         old.lastSuccessfulFetchAt = stored.lastSuccessfulFetchAt
         old.expiresAt = stored.expiresAt
       }
-      await use(old, '인쇄용 약도를 만들었습니다. 최신 도로 자료를 확인하고 있습니다.')
+      await use(old, '지금 인쇄할 수 있습니다. 최신 도로 자료도 확인하고 있습니다.')
       checkLocation()
+      const draft = old
+      const whenShown = interactions
+      backgroundRoads?.abort()
+      const controller = new AbortController()
+      backgroundRoads = controller
+      void resolvePlace(place, false, () => fetchGeography(place, controller.signal, true), controller.signal)
+        .then(async result => {
+          if (controller.signal.aborted || current !== draft) return
+          // Never replace an in-progress edit, export, or completed download.
+          if (busy || urls.length || interactions !== whenShown) {
+            status(result.state === 'failed' ? '보관된 도로 자료로 만든 약도입니다.' :
+              '최신 도로 자료를 받았습니다. 주소로 다시 만들면 반영됩니다.', false, 'search-status')
+            return
+          }
+          await searchAction(async () => {
+            await displaySnapshot(result)
+            checkLocation()
+          })()
+        })
+        .catch(() => {
+          if (!controller.signal.aborted && current === draft)
+            status('최신 도로 조회가 지연되어 보관된 약도를 사용합니다.', false, 'search-status')
+        })
+        .finally(() => {
+          if (backgroundRoads === controller) backgroundRoads = undefined
+        })
+      return
     }
   }
   let result
@@ -367,24 +420,7 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
     throw e
   }
   signal.throwIfAborted()
-  const { snap, state } = result,
-    changed = old && JSON.stringify(old.geo) !== JSON.stringify(snap.geo)
-  const p =
-    old && changed ? revised(old, snap.geo, name) : (old ?? createProject(snap.geo, name, details))
-  p.lastSuccessfulFetchAt = snap.lastSuccessfulFetchAt
-  p.expiresAt = snap.expiresAt
-  p.imported = false
-  p.refreshFailed = state === 'failed'
-  await use(
-    p,
-    state === 'failed'
-      ? '이전 조회본 · 갱신 실패. ' + result.error
-      : state === 'reused'
-        ? '저장본 재사용 · 외부 조회를 생략했습니다.'
-        : changed
-          ? '갱신 완료 · 변경된 지리 자료를 새 버전으로 저장했습니다.'
-          : '갱신 완료',
-  )
+  await displaySnapshot(result)
   checkLocation()
 }
 function isDasan(address: string) {
@@ -647,6 +683,7 @@ field('import').onchange = () => {
 }
 hook('erase', async () => {
   if (confirm('이 브라우저의 프로젝트, 받은 지도와 보관 ZIP을 모두 삭제할까요?')) {
+    backgroundRoads?.abort()
     await erase()
     location.reload()
   }
@@ -740,6 +777,7 @@ async function checkWithNaver() {
 }
 hook('naver', checkWithNaver)
 el('relock').onclick = () => {
+  backgroundRoads?.abort()
   busy?.abort()
   location.reload()
 }
