@@ -1,0 +1,22 @@
+{
+  "time": "2026-11-20T00:52:10.936Z",
+  "origin": "https://invitation-map-studio.github.io/?check=012792b",
+  "browser": "157.0.8103.79",
+  "checks": [
+    "새 탭 잠금 · 공급자 호출 0건",
+    "주소 입력으로 다산74 생성 또는 재사용",
+    "문구 편집·실행 취소",
+    "지도만 표시 시 footer 제거",
+    "JSON 다운로드·다시 열기·검수 초기화",
+    "공개 UI에서 ZIP 다운로드·10개 파일 재열기",
+    "보관 파일 재사용·SHA-256 일치",
+    "새로고침 후 다시 잠금",
+    "390px 화면 가로 넘침 없음 (Chrome)"
+  ],
+  "externalCalls": [
+    "POST",
+    "POST"
+  ],
+  "zipHash": "1d3ea46c96830d3b05cbca6ea239bcf29b4189d7ade46e74924937929d449664",
+  "liveRefresh": "갱신 완료 · 변경된 지리 자료를 새 버전으로 저장했습니다."
+}

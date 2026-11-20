@@ -1,0 +1,9 @@
+{
+  "osmBase": "2026-11-18T21:21:02Z",
+  "recordCount": 494144,
+  "buckets": 256,
+  "source": "https://download.geofabrik.de/asia/south-korea.html",
+  "license": "ODbL-1.0",
+  "sourceFileSha256": "dcdfd8b001344ad5564682c2a1e393d327620f296f3412b2156dd4e17cc61bb8",
+  "attribution": "© OpenStreetMap contributors · https://www.openstreetmap.org/copyright"
+}

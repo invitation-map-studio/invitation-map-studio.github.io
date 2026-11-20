@@ -1,0 +1,117 @@
+{
+  "png": {
+    "Dasan20_Wedding_Map.png": {
+      "size": [
+        3307,
+        3402
+      ],
+      "corner": [
+        251,
+        249,
+        245,
+        255
+      ]
+    },
+    "Dasan20_Wedding_Map_White.png": {
+      "size": [
+        3307,
+        3402
+      ],
+      "corner": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    "Dasan20_Wedding_Map_Transparent.png": {
+      "size": [
+        3307,
+        3402
+      ],
+      "corner": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "Dasan20_Wedding_MapOnly_Transparent.png": {
+      "size": [
+        3307,
+        2693
+      ],
+      "corner": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "preview.png": {
+      "size": [
+        827,
+        850
+      ],
+      "corner": [
+        251,
+        249,
+        245,
+        255
+      ]
+    }
+  },
+  "hashes": {
+    "Dasan20_Wedding_Map.svg": "0d95ef238f83d5b9468c7edea963eeaac3df51dff0f88e4fb3c49a64a118710e",
+    "Dasan20_Wedding_Map_Editable.svg": "73b7661e271197ff46cfe8add817df28465806a673bdbef5bce1d034fa27334d",
+    "Dasan20_Wedding_MapOnly.svg": "3d9ca31500ec1cf3098cb536e9969d7b6c89f86b7b10a88818c36d11e04329b5",
+    "Dasan20_Wedding_Map.png": "4ca1503ef93852f487ea6ae8d8d260163c80aa2f55185c750ed41e2473126cda",
+    "Dasan20_Wedding_Map_White.png": "c8827e7d20d0f6db4e8ccd868bd55376fd9416fca96a6fc747e077733980691f",
+    "Dasan20_Wedding_Map_Transparent.png": "676a0029a8e9f4ea1d3543492ce8389694e92e3413139c30c2e78ae65e963268",
+    "Dasan20_Wedding_MapOnly_Transparent.png": "7d835add5a3cae55bac5173091c543a37e87c2e205cfd05e1d67ed9b4298b032",
+    "Dasan20_Wedding_Map_Print.pdf": "e7e34973000392237f785a2505565da0b5eb1bb567e405e1ee5f7d944d477ce8",
+    "Dasan20_Wedding_Readme_KO.txt": "319f4b4c0df433cd5217de7d743b07cd7bf6d3f738db9c4e88b85a375791a0bf",
+    "Dasan20_Wedding_Verification.txt": "59e1a2ba3052ce7c5905c4cb52c409c01e90216dfb22514c27ddbba002911c88"
+  },
+  "same": true,
+  "aborted": true,
+  "maskIntersectionOverUnion": 0.9304713804713804,
+  "v2MaskIntersectionOverUnion": 0.966340841478963,
+  "durationMs": 1932,
+  "pdf": {
+    "pages": 1,
+    "sizeMm": [
+      140.00000010555556,
+      143.99999986666666
+    ],
+    "embeddedImages": 0,
+    "curves": 3506
+  },
+  "browser": "157.0.8103.79",
+  "timestamp": "2026-11-20T00:41:48.818Z",
+  "zipSha256": "3fda87e10606aa5ccbd52fb6c2966d21423d417b4cd587c9830b64b5e11d7502",
+  "dasan74": {
+    "roads": 118,
+    "landmarks": 16,
+    "mapItems": 82,
+    "review": {
+      "status": "pending",
+      "verifiedAt": null,
+      "note": "단지 대표점. 보행·차량 입구 확인 필요."
+    },
+    "files": 10,
+    "hashes": {
+      "Dasan74_Wedding_Map.svg": "c37c2e54d5e5308bdfcf19bea77d35953154c58aebca6b053d95788417fc7f24",
+      "Dasan74_Wedding_Map_Editable.svg": "bd0d067458eadf80e8a8976c10c135ef6072e85f9e2f7ad69461e87552d028cf",
+      "Dasan74_Wedding_MapOnly.svg": "e19fc00d74b211bcf46dd3328ceeb91aff4e178416dc97559737029db2600e15",
+      "Dasan74_Wedding_Map.png": "25f72da34882deb52ca076812a738fd506f7b18ba5d6e60047335da7706e9199",
+      "Dasan74_Wedding_Map_White.png": "27f0c5c594bdbcbfb894e845576e4bf9590ac735a33630e11e33aa4ecb4af45a",
+      "Dasan74_Wedding_Map_Transparent.png": "c7f35605de7e12d9284187631938d9d468925d1694bae28f4584bdf89da22a6c",
+      "Dasan74_Wedding_MapOnly_Transparent.png": "cc703f2b1b1294166f817cff90ab090fedfd46815a54186ada41c338f45b0ba9",
+      "Dasan74_Wedding_Map_Print.pdf": "5983585f3711506beadb5ee302fd2b26210597e1eaab512c8dab39d0a60be589",
+      "Dasan74_Wedding_Readme_KO.txt": "fd6281427715f21b99abc407a1c9455faffeed77024830446f5040827935861f",
+      "Dasan74_Wedding_Verification.txt": "b323cd730556fd1c7ff6c80914c0cd20773d2d66bbeee3e0d01c0ada6d14ab56"
+    },
+    "zipSha256": "4ae00d23e2dcb28d4706276634a00b2dc3dbb9fab8c08e613477a63ec6ab9447"
+  }
+}

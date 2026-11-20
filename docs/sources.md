@@ -37,3 +37,9 @@ python3 data/prepare_dasan74.py original.json dasan74.updated.json --fetched-at 
 | Juso 주소 좌표 검색·팝업 | 행정안전부 공개 설명에서 무료, 이용허락범위 제한 없음, 1시스템 1승인키로 안내한다. 검색형은 행정코드, 도로명코드, 지하여부, 본번·부번이 필요하며, 팝업형은 결과 반환 URL을 받는다. 투영 X·Y를 WGS84로 검증 변환해야 한다. [검색형](https://www.data.go.kr/data/15056663/openapi.do) · [팝업형](https://www.data.go.kr/data/15057559/openapi.do) | 승인키와 등록된 출처, 반환 시 POST 수신 및 CORS, 좌표계와 이용조건 실측은 보류. 이번 다산74 원본에는 Juso API 응답을 포함하지 않았다. |
 | 네이버 지도 | Geocoder 화면 대조는 등록 웹 주소와 브라우저용 ID가 필요하다. 출력·파생·보관 권한은 별도 확인 대상이다. 해당 확인 전에는 반환 좌표, 타일, 화면 캡처를 원천이나 24시간 캐시에 넣지 않는다. [JS Geocoder](https://navermaps.github.io/maps.js.ncp/docs/tutorial-Geocoder-Geocoding.html) · [Maps 약관](https://www.ncloud.com/policy/terms/maps) | 브라우저 조회·계정 한도 차단 시험은 등록된 Pages 출처 및 시험 Application 준비 후에 수행한다. 대표 계정, API별 일·월 한도, 초과 사용 불허, 중지·재개 기록은 운영자가 확인한다. [콘솔 가이드](https://guide.ncloud-docs.com/docs/application-maps-app-vpc) |
 | 다산순환로 20 제공 파일 | 완성 디자인 및 출력 규격의 회귀 비교용 샘플. 첨부 Readme의 기존 대조 방법과 날짜를 보존한다. | 다산74의 근거로 승격하거나 샘플에서 좌표를 역추정하지 않는다. |
+
+## 일반 도로명 검색의 배포 자료
+
+공개 Pages에서 ‘중구 세종대로 110’을 전국 범위의 Overpass 쿼리로 검색했을 때 시간 초과가 발생했다. 한국 Geofabrik 추출본에서 도로명·건물번호가 유효한 OSM 객체 494,144건을 선별했다. 같은 주소에 여러 OSM 객체가 있을 수 있다. 이 수는 고유 주소 수나 한국 주소 전체에 대한 지원율이 아니다. 후보 선택 시 현재 객체 ID와 도로명·건물번호를 다시 확인하고 주변 도로 조회까지 성공해야 갱신 시각을 기록한다.
+
+색인 원천은 2026-11-18 21:21:02 UTC의 OSM 데이터다. 약 10 MB의 압축 자료를 256개로 나눴으며 브라우저는 도로명에 해당하는 조각만 읽는다. 공개 시설의 이름, 행정구역, 좌표, OSM ID를 후보 구분에 사용한다. 데이터 기록 시각이 최근 방문이나 편집으로 바뀌지 않는다. 같은 원천으로 `python scripts/prepare-address-index.py south-korea-latest.osm.pbf public/address-index`를 실행하면 색인을 재생성할 수 있다. pyosmium 4.3.2를 사용한다. [원천과 해시](../public/address-index/source.json) · [Geofabrik 한국 추출본](https://download.geofabrik.de/asia/south-korea.html) · [OSM 이용조건](https://www.openstreetmap.org/copyright)

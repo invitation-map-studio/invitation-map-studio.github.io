@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-11-20T00:50:23.897Z",
+  "browser": "157.0.8103.79",
+  "concurrentTabs": 2,
+  "providerCalls": 1,
+  "snapshotHash": "6c49232726f0cfdd93d0d56d89e0b114ac3d806af93421a849a03e7c0dfdd229",
+  "successAt": "2026-11-20T00:50:23.842Z",
+  "expiresAt": "2026-11-21T00:50:23.842Z",
+  "distinct": 4,
+  "hash": "8a6111c3ca752ed6d5f8e8a6daa3ba4b8c3b0bf55f00a87ac2b285024ef87e5f",
+  "readHash": "8a6111c3ca752ed6d5f8e8a6daa3ba4b8c3b0bf55f00a87ac2b285024ef87e5f",
+  "unchanged": true,
+  "reuse": "reused"
+}

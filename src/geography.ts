@@ -1,3 +1,4 @@
+import { indexedAddresses } from './address-index'
 import registered from '../data/evaluation/addresses.json'
 import {
   baseItem,
@@ -97,6 +98,14 @@ export async function addresses(
   const address = normalize(input),
     match = address.match(/(?:^|\s)([가-힣a-zA-Z0-9·.]+(?:길|로))\s+(\d{1,5}(?:-\d{1,5})?)$/)
   if (!match) throw Error('도로명과 건물번호까지 입력해 주세요. 예시: 다산중앙로82번안길 74')
+  // The extract identifies possible objects. Their current address and position are checked
+  // again by ID before a successful geographic refresh can be recorded.
+  try {
+    const candidates = await indexedAddresses(address, match[1], match[2], signal)
+    if (candidates.length) return candidates
+  } catch (error) {
+    if (signal.aborted) throw error
+  }
   const filter = `["addr:housenumber"="${match[2]}"]["addr:street"="${match[1]}"](33,124,39,132)`
   const rows = await query(`nwr${filter};out meta center 30;`, signal)
   return rows.flatMap((e) => {
@@ -142,6 +151,9 @@ export async function fetchGeography(place: Place, signal: AbortSignal): Promise
   )
   if (!addressObject) throw Error('기존 목적지 객체를 다시 확인할 수 없습니다.')
   if (site) {
+    const known = registered.find((r) => r.site === place.id && r.address === place.address)
+    if (!known || addressObject.tags?.name !== known.name)
+      throw Error('단지의 현재 명칭과 주소 근거를 다시 확인해 주세요.')
     const ring = addressObject.geometry
     if (
       !ring ||
