@@ -495,7 +495,7 @@ function revised(old: Project, geo: Geography, name: string): Project {
 async function make(place: Place, name: string, force: boolean, signal: AbortSignal, details = '') {
   const footer = current.spec.items.find((item) => item.id === 'details')
   let old =
-    current.geo && (!searching || current.spec.style === 'neighborhood') &&
+    current.geo && (!searching || current.spec.captionVersion === 2) &&
     placeKey(current.geo.place) === placeKey(place) &&
     current.name === name &&
     (!searching || (footer?.kind === 'text' && footer.text === details))

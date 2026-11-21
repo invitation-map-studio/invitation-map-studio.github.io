@@ -69,6 +69,18 @@ try {
     assert.match(await paper.textContent(),new RegExp(station))
     if (slug === 'cheongdam') {
       assert.equal(await paper.locator('[data-item="transit-stop-B"]').count(),1)
+      const paired = await paper.evaluate(svg => {
+        const item = id => svg.querySelector('[data-item="' + id + '"]')
+        const venue = item('venue').getBBox(), pin = item('destination').transform.baseVal.getItem(0).matrix
+        const station = item('transit-exit-A').getBBox(), circle = item('transit-stop-A')
+        return { role:item('venue-role')?.textContent, venueRight:venue.x+venue.width, pinX:pin.e,
+          venueBottom:venue.y+venue.height, stationTop:station.y, stationX:station.x+station.width/2,
+          circleX:Number(circle.getAttribute('cx')), circleY:Number(circle.getAttribute('cy')) }
+      })
+      assert.equal(paired.role, '도착지')
+      assert.ok(Math.abs(paired.venueRight - paired.pinX) < 55)
+      assert.ok(paired.venueBottom < paired.circleY && paired.stationTop > paired.circleY)
+      assert.ok(Math.abs(paired.stationX - paired.circleX) < 2)
       const arterials = await paper.locator('[data-item^="street-"]').allTextContents()
       for (const name of ['학동로','영동대로','도산대로','삼성로','올림픽대로']) assert.ok(arterials.includes(name), arterials.join(', '))
       assert.equal(await paper.locator('[data-item^="road-"][data-item$="-center"]').count(),0)

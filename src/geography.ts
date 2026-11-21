@@ -419,6 +419,34 @@ function obstacles(items: Item[]) {
   return { occupied, segments }
 }
 
+// Give a pin and a nearby subway circle their own caption groups at print size.
+function destinationCaption(name: string, pin: Extract<Item, {radius: number}>,
+  transit: Item[], streets: Segment[]): Item[] {
+  const stops = transit.filter(stop => stop.kind === 'dot')
+  if (!stops.some(stop => stop.kind === 'dot' && distance([pin.x,pin.y], [stop.x,stop.y]) < 95)) return []
+  const {occupied} = obstacles(stops)
+  const size = Math.min(37, Math.floor(620 / Math.max(1, textWidth(name,1))))
+  if (size < 24) return []
+  const width = textWidth(name,size), gap = 29
+  const head = pin.y - 37
+  // Try adjacent blocks first. If a road needs a small gap, both captions
+  // become reserved areas before road strokes or landmark labels are placed.
+  for (const lines of [streets, []]) {
+    for (const side of [-1, 1]) {
+      const x = pin.x + side * (width / 2 + gap)
+      const y = head + size * .35
+      const title = placement(name,size,x,y,0,lines,occupied)
+      const roleX = pin.x + side * (gap + textWidth('도착지',21)/2)
+      const roleY = y - size - 8
+      if (title && placement('도착지',21,roleX,roleY,0,lines,occupied)) {
+        return [label('venue',name,x,y,size,{weight:700}),
+          label('venue-role','도착지',roleX,roleY,21,{font:'sans'})]
+      }
+    }
+  }
+  return []
+}
+
 // Place the exit name on the map when space permits. The guide below the map
 // always includes the full name, including at crowded junctions.
 export function exitLabels(items: Item[], place: Place, streets: Segment[] = [], stacked = false): Item[] {
@@ -434,10 +462,18 @@ export function exitLabels(items: Item[], place: Place, streets: Segment[] = [],
       const width = Math.max(textWidth(station, 28), textWidth(exit, 23))
       const side = width/2 + marker.radius + 18
       let placed = false
-      for (const [dx,dy] of [[-side,-6],[side,-6],[0,48],[0,-52],[-side,-36],[side,-36],[-side,26],[side,26]]) {
+      const pin = items.find(i => i.id === 'destination')
+      const paired = items.some(i => i.id === 'venue-role') && pin?.kind === 'flower' &&
+        distance([pin.x,pin.y], [marker.x,marker.y]) < 95
+      const offsets = [[-side,-6],[side,-6],[0,48],[0,-52],[-side,-36],[side,-36],[-side,26],[side,26]]
+      if (paired) offsets.unshift([0,58],[-side,40],[side,40])
+      // At crowded pins the caption stays against its circle. Road ink is
+      // clipped below when it would otherwise run through the station name.
+      const labelStreets = paired ? [] : streets
+      for (const [dx,dy] of offsets) {
         const x = marker.x+dx, y = marker.y+dy
-        const upper = placement(station,28,x,y,0,streets,occupied)
-        const lower = placement(exit,23,x,y+31,0,streets,occupied)
+        const upper = placement(station,28,x,y,0,labelStreets,occupied)
+        const lower = placement(exit,23,x,y+31,0,labelStreets,occupied)
         if (!upper || !lower) continue
         result.push(label('transit-exit-'+key,station,x,y,28,{weight:700}),
           label('transit-number-'+key,exit,x,y+31,23,{font:'sans'}))
@@ -703,6 +739,90 @@ export function localRoadItems(spec: Spec, place: Place, roads: LocalRoad[], str
   return additions
 }
 
+function placeVenueName(name: string, items: Item[], segments: Segment[], occupied: Rect[]) {
+  // Keep the marker at its measured point while choosing a clear position for its name.
+  let venueSize = Math.max(24, Math.min(40, Math.floor(990 / Math.max(1, textWidth(name, 1)))))
+  const beside = textWidth(name, venueSize) / 2 + 38
+  let venue: Placement | undefined
+  for (const [dx, dy] of [
+    [0, -72],
+    [38 - beside, -70],
+    [beside - 38, -70],
+    [0, 64],
+    [beside, 12],
+    [-beside, 12],
+    [beside, -20],
+    [-beside, -20],
+    [-34, -64],
+    [34, -64],
+    [0, -95],
+    [0, 125],
+    [-beside, 49],
+    [beside, 49],
+    [-beside, -52],
+    [beside, -52],
+    [-75, -60],
+    [75, -60],
+  ]) {
+    venue = placement(name, venueSize, 700 + dx, 605 + dy, 0, segments, occupied)
+    if (venue) break
+  }
+  if (!venue) {
+    // Minor streets are drawn last and can leave space under the venue name.
+    // Try a compact label beside the pin before resorting to the top margin.
+    const mainSegments = obstacles(items.filter(i => i.id.startsWith('road-'))).segments
+    for (const size of [venueSize, Math.max(24, venueSize - 7), 24]) {
+      const side = textWidth(name,size)/2 + 42
+      for (const [dx,dy] of [[0,61],[0,-77],[side,-16],[-side,-16],[side,32],[-side,32],
+        [-45,77],[45,77],[-45,-85],[45,-85],[0,105]]) {
+        venue = placement(name,size,700+dx,605+dy,0,mainSegments,occupied)
+        if (venue) break
+      }
+      // Search the nearby blocks when none of the preferred offsets fits between arterials.
+      for (let radius = 40; radius <= 150 && !venue; radius += 15) {
+        for (let step = 0; step < 24 && !venue; step++) {
+          const angle = step * Math.PI / 12
+          venue = placement(name, size, 700 + radius * Math.cos(angle),
+            605 + radius * Math.sin(angle), 0, mainSegments, occupied)
+        }
+      }
+      if (venue) { venueSize = size; break }
+    }
+  }
+  if (venue) {
+    items.push(label('venue', name, venue.x, venue.y, venueSize, { weight: 700 }))
+    occupied.push(venue.bounds)
+  } else {
+    // The blank strip above the map preserves the name in map-only output for dense sites.
+    const headerSize = Math.max(
+      18,
+      Math.min(27, Math.floor(1040 / Math.max(1, textWidth(name, 1)))),
+    )
+    const lines: string[] = []
+    let line = ''
+    for (const char of name) {
+      if (line && textWidth(line + char, headerSize) > 1040) {
+        lines.push(line)
+        line = ''
+      }
+      line += char
+    }
+    lines.push(line)
+    lines.forEach((text, i) =>
+      items.push(
+        label(
+          i ? 'venue-' + i : 'venue',
+          text,
+          700,
+          lines.length === 1 ? 139 : 119 + i * 26,
+          headerSize,
+          { weight: 700 },
+        ),
+      ),
+    )
+  }
+}
+
 const majorRoads = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
 
 export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): Spec {
@@ -781,14 +901,16 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
   if (nearby.length) {
     try { addressStreet = parseRoadAddress(place.address).street } catch { /* Legacy free-form address. */ }
   }
-  const spec: Spec = {layout:'minimal', style:'neighborhood', ink:'#282626', items}
+  const spec: Spec = {layout:'minimal', style:'neighborhood', captionVersion:2, ink:'#282626', items}
   const access = selectLocalRoads({...spec, items:transit}, place, nearby, addressStreet)
   for (const road of access) for (let i=1; i<road.points.length; i++) {
     const [a,b] = clip(road.points[i-1], road.points[i])
     if (a) segments.push({a,b,length:distance(a,b),bounds:envelope([a,b])})
   }
-  const exits = exitLabels([destination, ...transit], place, [...streetsForLabels,...segments], true)
-  const captions = obstacles(exits).occupied
+  const labelStreets = [...streetsForLabels, ...segments]
+  const pairedVenue = destinationCaption(name, destination, transit, labelStreets)
+  const exits = exitLabels([destination, ...pairedVenue, ...transit], place, labelStreets, true)
+  const captions = obstacles([...pairedVenue, ...exits]).occupied
   for (const { road, points, center } of simplified) {
     let run: Point[] = [],
       section = 0
@@ -877,88 +999,8 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
     if (marked.length === 6) break
   }
   items.push(destination)
-  // Keep the marker at its measured point while choosing a clear position for its name.
-  let venueSize = Math.max(24, Math.min(40, Math.floor(990 / Math.max(1, textWidth(name, 1)))))
-  const beside = textWidth(name, venueSize) / 2 + 38
-  let venue: Placement | undefined
-  for (const [dx, dy] of [
-    [0, -72],
-    [38 - beside, -70],
-    [beside - 38, -70],
-    [0, 64],
-    [beside, 12],
-    [-beside, 12],
-    [beside, -20],
-    [-beside, -20],
-    [-34, -64],
-    [34, -64],
-    [0, -95],
-    [0, 125],
-    [-beside, 49],
-    [beside, 49],
-    [-beside, -52],
-    [beside, -52],
-    [-75, -60],
-    [75, -60],
-  ]) {
-    venue = placement(name, venueSize, 700 + dx, 605 + dy, 0, segments, occupied)
-    if (venue) break
-  }
-  if (!venue) {
-    // Minor streets are drawn last and can leave space under the venue name.
-    // Try a compact label beside the pin before resorting to the top margin.
-    const mainSegments = obstacles(items.filter(i => i.id.startsWith('road-'))).segments
-    for (const size of [venueSize, Math.max(24, venueSize - 7), 24]) {
-      const side = textWidth(name,size)/2 + 42
-      for (const [dx,dy] of [[0,61],[0,-77],[side,-16],[-side,-16],[side,32],[-side,32],
-        [-45,77],[45,77],[-45,-85],[45,-85],[0,105]]) {
-        venue = placement(name,size,700+dx,605+dy,0,mainSegments,occupied)
-        if (venue) break
-      }
-      // Search the nearby blocks when none of the preferred offsets fits between arterials.
-      for (let radius = 40; radius <= 150 && !venue; radius += 15) {
-        for (let step = 0; step < 24 && !venue; step++) {
-          const angle = step * Math.PI / 12
-          venue = placement(name, size, 700 + radius * Math.cos(angle),
-            605 + radius * Math.sin(angle), 0, mainSegments, occupied)
-        }
-      }
-      if (venue) { venueSize = size; break }
-    }
-  }
-  if (venue) {
-    items.push(label('venue', name, venue.x, venue.y, venueSize, { weight: 700 }))
-    occupied.push(venue.bounds)
-  } else {
-    // The blank strip above the map preserves the name in map-only output for dense sites.
-    const headerSize = Math.max(
-      18,
-      Math.min(27, Math.floor(1040 / Math.max(1, textWidth(name, 1)))),
-    )
-    const lines: string[] = []
-    let line = ''
-    for (const char of name) {
-      if (line && textWidth(line + char, headerSize) > 1040) {
-        lines.push(line)
-        line = ''
-      }
-      line += char
-    }
-    lines.push(line)
-    lines.forEach((text, i) =>
-      items.push(
-        label(
-          i ? 'venue-' + i : 'venue',
-          text,
-          700,
-          lines.length === 1 ? 139 : 119 + i * 26,
-          headerSize,
-          { weight: 700 },
-        ),
-      ),
-    )
-  }
-
+  if (pairedVenue.length) items.push(...pairedVenue)
+  else placeVenueName(name, items, segments, occupied)
   items.push(...exits)
 
   // Print a street name beside its own longest visible segments, parallel and upright.
