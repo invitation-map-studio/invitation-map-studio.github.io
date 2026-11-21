@@ -1,7 +1,7 @@
 import { streetCenterline, type StreetPath } from './carriageways'
 import type { LocalRoad } from './local-roads'
 import type { Building } from './buildings'
-import { mapBounds, scaleBarMeters, stationsFor, transitItems } from './transit'
+import { mapBounds, stationsFor, transitItems } from './transit'
 import { indexedAddresses } from './address-index'
 import { registeredPlaces, mapScale } from './location-check'
 import { parseRoadAddress, matchesRegion } from './road-address'
@@ -489,10 +489,14 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
   const marked: Point[] = []
   const size = 24
   const extras = new Set<string>()
+  const busReach = Math.min(400, Math.max(145, place.radius))
   let shownStop: string | undefined
   for (const { id, name, point, key, kind, meters } of candidates) {
     if (kind === 'storefront' && (marked.length >= 4 || meters > 70)) continue
-    if (kind && (spec.style !== 'neighborhood' || (kind !== 'storefront' && extras.has(kind)) || meters > (kind === 'shop' ? 110 : 145))) continue
+    if (kind) {
+      const reach = kind === 'stop' ? busReach : kind === 'shop' ? 110 : 145
+      if (spec.style !== 'neighborhood' || (kind !== 'storefront' && extras.has(kind)) || meters > reach) continue
+    }
     if (id === place.id || names.has(key) || key === venueName ||
         (venueName.length >= 4 && key.includes(venueName))) continue
     const [x, y] = point
@@ -592,7 +596,7 @@ export function selectLocalRoads(spec: Spec, place: Place, roads: LocalRoad[], s
     take(ranked.filter(r => !r.road.foot && r.meters <= 95), 1)
     take(ranked.filter(r => r.road.foot && r.meters <= 65), 1)
   }
-  if (spec.style === 'neighborhood' && !reference) {
+  if (spec.style === 'neighborhood' && !reference && place.radius < 300) {
     const names = new Map<string, {road: LocalRoad; meters: number}[]>()
     for (const road of roads) {
       if (road.foot || !road.name) continue
@@ -710,12 +714,6 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
     axes.cy - (lat - place.lat) * axes.y,
   ]
   const items: Item[] = [label('title', '오시는 길', 700, 95, 30, { spacing: 4 })]
-  const barEnd = mapBounds[2], barStart = barEnd - scaleBarMeters * scale
-  items.push(
-    label('scale-caption', scaleBarMeters + ' m', (barStart+barEnd)/2, 93, 22, {font:'sans'}),
-    {...baseItem('scale-bar','soft'), kind:'line', width:2.4,
-      points:[[barStart,102],[barStart,111],[barEnd,111],[barEnd,102]]},
-  )
   const roads = geo.roads.filter(road => majorRoads.has(road.highway))
   // A shared node with three distinct branches is a junction. A bend, way split,
   // or crossing on another level is not. Preserve these nodes during simplification.
@@ -743,7 +741,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
   const streetsForLabels: Segment[] = []
   const groups = new Map<string, StreetPath[]>()
   for (const road of roads) {
-    const path = { road, points: simplify(road.points.map(project), road.nodes, junctions, 4 * scale) }
+    const path = { road, points: simplify(road.points.map(project), road.nodes, junctions, (place.radius < 300 ? 4 : 10) * scale) }
     const key = road.name ? JSON.stringify([road.name, road.level]) : String(road.id)
     const group = groups.get(key) ?? []
     group.push(path)
@@ -756,7 +754,8 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
     let center
     const divided = paths.filter(p => p.road.oneWay && p.road.name)
     const undivided = paths.filter(p => !p.road.oneWay || !p.road.name)
-    if (divided.length > 1) {
+    // Older saved close-ups use a single schematic axis. At invitation scale keep both mapped carriageways.
+    if (place.radius < 300 && divided.length > 1) {
       const edges = divided.flatMap(({points}) => points.slice(1).flatMap((p,i) => {
         const [a,b] = clip(points[i], p, extended)
         return a && distance(a,b) > .1 ? [{a,b,length:distance(a,b)}] : []
@@ -795,7 +794,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
       section = 0
     function flush() {
       if (run.length > 1) {
-        const width = ['motorway', 'trunk', 'primary'].includes(road.highway) ? 3.2 : 2.3
+        const width = ['motorway', 'trunk', 'primary'].includes(road.highway) ? 5 : 3
         items.push({
           ...baseItem('road-' + road.id + '-' + section++ + (center ? '-center' : ''), 'soft'),
           kind: 'line',
@@ -860,7 +859,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
     if (!inside([bounds[0], bounds[1]]) || !inside([bounds[2], bounds[3]]) ||
         occupied.some(rect => overlap(bounds, rect)) ||
         marked.some(p => distance(p, at) < 55)) continue
-    items.push({ ...baseItem('junction-' + crossing.id), kind: 'dot', x, y, radius: 3.5 })
+    items.push({ ...baseItem('junction-' + crossing.id), kind: 'dot', x, y, radius: 5 })
     occupied.push(bounds)
     marked.push(at)
     if (title) {
@@ -875,7 +874,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
         break
       }
     }
-    if (marked.length === 2) break
+    if (marked.length === 6) break
   }
   items.push(destination)
   // Keep the marker at its measured point while choosing a clear position for its name.
@@ -884,6 +883,8 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
   let venue: Placement | undefined
   for (const [dx, dy] of [
     [0, -72],
+    [38 - beside, -70],
+    [beside - 38, -70],
     [0, 64],
     [beside, 12],
     [-beside, 12],
@@ -912,9 +913,17 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
       for (const [dx,dy] of [[0,61],[0,-77],[side,-16],[-side,-16],[side,32],[-side,32],
         [-45,77],[45,77],[-45,-85],[45,-85],[0,105]]) {
         venue = placement(name,size,700+dx,605+dy,0,mainSegments,occupied)
-        if (venue) { venueSize = size; break }
+        if (venue) break
       }
-      if (venue) break
+      // Search the nearby blocks when none of the preferred offsets fits between arterials.
+      for (let radius = 40; radius <= 150 && !venue; radius += 15) {
+        for (let step = 0; step < 24 && !venue; step++) {
+          const angle = step * Math.PI / 12
+          venue = placement(name, size, 700 + radius * Math.cos(angle),
+            605 + radius * Math.sin(angle), 0, mainSegments, occupied)
+        }
+      }
+      if (venue) { venueSize = size; break }
     }
   }
   if (venue) {
@@ -967,7 +976,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
   )
   let streetLabels = 0
   for (const street of ranked) {
-    if (streetLabels === 2) break
+    if (streetLabels === 5) break
     let chosen: Placement | undefined
     for (const seg of street.parts.slice(0, 10)) {
       if (seg.length < Math.min(60, textWidth(street.text, 25) * 0.38)) break
@@ -984,7 +993,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
             25,
             x - Math.sin(theta) * offset,
             y + Math.cos(theta) * offset,
-            0,
+            angle,
             segments,
             occupied,
           )

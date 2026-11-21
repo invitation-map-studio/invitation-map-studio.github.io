@@ -42,14 +42,17 @@ export function stationsFor(place: Place, numbered = true): Stop[] {
 }
 
 export const closeMapZoom = 18
-export const scaleBarMeters = 30
 
-// Match the ground resolution of the Naver reference view at the document's
-// native 140 mm print width. One SVG unit is 0.1 mm (96 CSS px per inch).
-export function printRadius(place: Pick<Place, 'lat'>) {
-  const metersPerPixel = 2 * Math.PI * 6378137 * Math.cos(place.lat * Math.PI / 180) /
-    (256 * 2 ** closeMapZoom)
-  return Math.round(440 * .1 * 96 / 25.4 * metersPerPixel)
+// Frame the venue and nearby subway approaches, with a neighborhood-sized
+// default where there is no station within walking distance.
+export function printRadius(place: Place) {
+  let radius = 350
+  const metersX = 111320 * Math.cos(place.lat * Math.PI / 180)
+  for (const stop of stationsFor(place)) {
+    const distance = Math.hypot((stop.lon - place.lon) * metersX, (stop.lat - place.lat) * 111320)
+    if (distance <= 1000) radius = Math.max(radius, distance)
+  }
+  return Math.ceil(radius)
 }
 
 export function transitItems(place: Place, numbered = true, vicinity = false): Item[] {

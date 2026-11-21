@@ -403,6 +403,7 @@ function compareAccessRoads(layer: RoadLayer, address: string, point: Point) {
 
 async function use(p: Project, message: string, previous?: Project | null, arrange = false) {
   setProgress('work', '약도 불러오는 중')
+  p.spec.items = p.spec.items.filter(item => item.id !== 'scale-bar' && item.id !== 'scale-caption')
   if (p.geo && !p.imported) {
     const guides = p.spec.items.filter(i => i.id.startsWith('transit-'))
     // Replace the original station-center layer only when its labels and pins are unedited.

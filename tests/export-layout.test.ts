@@ -140,23 +140,22 @@ test('미등록 주소에서도 출구 소속 역·호선과 실제 출구 좌�
   assert.ok(changed.some(i => i.kind === 'text' && /청담역 3번 출구.*0m/.test(i.text)))
 })
 
-test('근거리 약도는 가까운 출구 이름을 도면에 남기고 먼 역 때문에 범위를 넓히지 않는다', async () => {
+test('주변 역을 포함하는 약도는 두 출구를 표시하고 축척 막대를 생략한다', async () => {
   const { printRadius } = await import('../src/transit')
   const place = { id: 'node/1', address: '서울특별시 강남구 학동로 519',
     lon: 127.0554556, lat: 37.5201877, radius: 1500, entrance: 'address' }
   place.radius = printRadius(place)
-  assert.equal(place.radius, 79)
+  assert.equal(place.radius, 740)
   const map = layout({ source: 'osm', place, roads: [], landmarks: [] }, '예식장')
   assert.equal(map.style, 'neighborhood')
-  const bar = map.items.find(i => i.id === 'scale-bar')
-  assert.ok(bar?.kind === 'line')
-  assert.ok(Math.abs((bar.points[2][0] - bar.points[1][0]) * place.radius/440 - 30) < 1e-8)
+  assert.ok(!map.items.some(i => ['scale-bar','scale-caption'].includes(i.id)))
   assert.deepEqual(map.items.filter(i => ['transit-exit-A','transit-number-A'].includes(i.id)).map(i => i.kind === 'text' && i.text), ['청담역','12번 출구'])
-  assert.ok(!map.items.some(i => i.id === 'transit-guide-B'))
+  assert.ok(map.items.some(i => i.id === 'transit-stop-B'))
+  assert.ok(map.items.some(i => i.id === 'transit-guide-B' && i.kind === 'text' && i.text.includes('봉은사역 3번 출구')))
 
   const suburban = { ...fixture.geo.place, radius: 1500 }
   suburban.radius = printRadius(suburban)
-  assert.equal(suburban.radius, 79)
+  assert.equal(suburban.radius, 350)
   const suburbMap = layout({ ...fixture.geo, place: suburban }, fixture.name)
   assert.ok(suburbMap.items.some(i => i.id === 'transit-guide-A' && i.kind === 'text' && /다산역.*직선 약.*지도 밖/.test(i.text)))
   assert.ok(!suburbMap.items.some(i => i.id.startsWith('transit-stop-')))
