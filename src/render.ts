@@ -1,5 +1,5 @@
 import { destinationPath } from './symbols'
-import type { Item, Project, Spec } from './model'
+import { laneLayerVisible, type Item, type Project, type Spec } from './model'
 const NS = 'http://www.w3.org/2000/svg'
 function svg(tag: string, attrs: Record<string, string | number> = {}) {
   const el = document.createElementNS(NS, tag)
@@ -81,7 +81,8 @@ function legacyBusMarks(spec: Spec) {
 // The generator emits landmarks in priority order. A building's name and
 // symbol count as one place, even when one of them was hidden manually.
 export function displayItems(spec: Spec, buses = legacyBusMarks(spec)) {
-  if (spec.buildingLimit === undefined) return spec.items
+  const items = spec.items.filter(item => laneLayerVisible(spec, item))
+  if (spec.buildingLimit === undefined) return items
   const visible = new Set(spec.items.filter(i => !i.hidden).map(i => i.id))
   const omit = new Set<string>()
   let count = 0
@@ -94,7 +95,7 @@ export function displayItems(spec: Spec, buses = legacyBusMarks(spec)) {
       omit.add(name)
     }
   }
-  return spec.items.filter(i => !omit.has(i.id))
+  return items.filter(i => !omit.has(i.id))
 }
 export function render(project: Project, mapOnly = false, interactive = false) {
   const height = mapOnly ? 1140 : 1440

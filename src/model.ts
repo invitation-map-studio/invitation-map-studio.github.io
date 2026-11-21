@@ -22,8 +22,12 @@ export interface Spec {
   style?: 'vicinity' | 'neighborhood'
   captionVersion?: 2
   buildingLimit?: 0 | 2 | 4
+  showLanes?: boolean
   items: Item[]
   ink: string
+}
+export function laneLayerVisible(spec: Spec, item: Item) {
+  return spec.showLanes === true || !/^(?:local-(?:addr-)?lane-|local-street-name(?:-|$))/.test(item.id)
 }
 export interface Place {
   address: string

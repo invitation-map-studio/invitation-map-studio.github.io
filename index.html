@@ -81,7 +81,7 @@
               인쇄용 약도는 작업실의 주소·건물·도로 자료로 만듭니다. 최신 도로를 직접 다시 조회할 때 Overpass를 사용합니다. 프로젝트는 이
               브라우저에 저장합니다.
             </p>
-            <p id="naver-notice" class="fine" hidden>주소로 약도를 만들면 네이버 지도에서 예식장 위치를 자동 대조합니다. 인쇄본에는 큰길과 교차로, 목적지와 가까운 출구 주변의 골목(가는 실선)·보행로(점선)를 표시하고, 가까운 지하철역의 출구 번호와 직선거리를 자동으로 찾습니다.</p>
+            <p id="naver-notice" class="fine" hidden>주소로 약도를 만들면 네이버 지도에서 예식장 위치를 자동 대조합니다. 인쇄본에는 큰길과 교차로, 보행로(점선)를 표시하고, 가까운 지하철역의 출구 번호와 직선거리를 자동으로 찾습니다. 골목길은 미리보기에서 켤 수 있습니다.</p>
             <button id="naver" hidden>현재 약도 네이버 위치 대조</button>
           </section>
           <section>
@@ -170,6 +170,7 @@
                 <option value="2">최대 2곳</option><option value="0">숨기기</option>
               </select>
             </label>
+            <label class="check"><input type="checkbox" role="switch" id="show-lanes" /> 골목길 표시</label>
           </div>
           <div class="paper" id="paper"></div>
           <div class="row quick-export" id="quick-export">

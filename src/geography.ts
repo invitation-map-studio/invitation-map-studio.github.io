@@ -658,7 +658,7 @@ export function localRoadItems(spec: Spec, place: Place, roads: LocalRoad[], str
     /^(?:road-|local-(?:addr-)?(?:foot|lane)-)(\d+)-/.exec(i.id)?.[1]))
   const { occupied, segments } = obstacles(spec.items)
   const additions: Item[] = []
-  const named = new Map<string, Segment[]>()
+  const named = new Map<string, (Segment & {foot:boolean})[]>()
   // Snap a side street to a schematic centreline only at an actual shared OSM node.
   const axes = mapScale(place)
   const centerItems = spec.items.filter(i => i.kind === 'line' && i.id.endsWith('-center'))
@@ -705,17 +705,18 @@ export function localRoadItems(spec: Spec, place: Place, roads: LocalRoad[], str
         segments.push(segment)
         if (addr || (spec.style === 'neighborhood' && road.name)) {
           const list = named.get(road.name) ?? []
-          list.push(segment)
+          list.push({...segment, foot:road.foot})
           named.set(road.name, list)
         }
       }
     }
   }
-  let labelCount = spec.items.filter(i => i.id.startsWith('local-street-name')).length
+  let labelCount = spec.items.filter(i => /^local-(street|foot)-name/.test(i.id)).length
   const streetNames = [...named.keys()].sort((a,b) => Number(b === street) - Number(a === street))
   for (const name of streetNames) {
     if (labelCount >= 3 || spec.items.some(i => i.kind === 'text' && i.text === name)) continue
     let chosen: Placement | undefined
+    let foot = false
     for (const seg of named.get(name)!.sort((a,b) => b.length-a.length)) {
       if (seg.length < 52) continue
       for (const f of [.5,.25,.75]) {
@@ -723,14 +724,15 @@ export function localRoadItems(spec: Spec, place: Place, roads: LocalRoad[], str
         const side = textWidth(name,22)/2 + 12
         for (const [dx,dy] of [[0,-12],[0,32],[-side,7],[side,7],[-side,-12],[side,32]]) {
           chosen=placement(name,22,x+dx,y+dy,0,segments,occupied)
-          if (chosen) break
+          if (chosen) { foot = seg.foot; break }
         }
         if (chosen) break
       }
       if (chosen) break
     }
     if (chosen) {
-      const id = name === street ? 'local-street-name' : 'local-street-name-' + name
+      const prefix = foot ? 'local-foot-name' : 'local-street-name'
+      const id = name === street ? prefix : prefix + '-' + name
       additions.push(label(id, name, chosen.x, chosen.y, 22, {font:'sans'}))
       occupied.push(chosen.bounds)
       labelCount++

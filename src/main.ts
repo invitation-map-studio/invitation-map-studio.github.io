@@ -290,7 +290,9 @@ function paint() {
   el('osm-credit').hidden = current.origin !== 'osm'
   const minimal = current.spec.layout === 'minimal'
   el('coverage').textContent = minimal ? [
-    current.spec.items.some(i => i.id.startsWith('road-')) ? '' : '이 범위에 표시할 큰길 자료가 없습니다.',
+    current.spec.items.some(i => i.id.startsWith('road-')) ? '' :
+      !current.spec.showLanes && current.spec.items.some(i => /^local-(addr-)?lane-/.test(i.id))
+        ? '이 범위의 작은 도로를 보려면 골목길 표시를 켜세요.' : '이 범위에 표시할 큰길 자료가 없습니다.',
     current.spec.items.some(i => i.id.startsWith('building-name-')) ? '' : '이 약도에 표시된 주변 건물명이 없습니다.',
     current.spec.items.some(i => i.id.startsWith('transit-guide-')) ? '' : '1 km 이내에 등록된 지하철역이 없습니다.',
   ].filter(Boolean).join(' ') : ''
@@ -383,9 +385,9 @@ async function applyRoadCheck() {
   if (roadLayer !== check.layer) return changed
   const local = current.spec.items.some(i => !i.hidden && i.kind === 'line' && i.id.startsWith('local-addr-'))
   const major = new Set(current.geo!.roads.filter(r => r.name === street).map(r => String(r.id)))
-  const shown = local || current.spec.items.some(i => !i.hidden && i.kind === 'line' &&
+  const mapped = local || current.spec.items.some(i => !i.hidden && i.kind === 'line' &&
     major.has(/^road-(\d+)-/.exec(i.id)?.[1] ?? ''))
-  el('road-check').textContent = '네이버 주소 대조 · ' + street + (shown ? ' 표시 확인' : '의 공개 도로 선형을 확인하지 못했습니다.') +
+  el('road-check').textContent = '네이버 주소 대조 · ' + street + (mapped ? ' 도로 자료 확인' : '의 공개 도로 선형을 확인하지 못했습니다.') +
     (changed ? ' · 주변 골목·보행로 보강' : '')
   return changed
 }
@@ -431,6 +433,7 @@ async function use(p: Project, message: string, previous?: Project | null, arran
         const drawing = layout(p.geo, p.name, roads)
         drawing.items = [...drawing.items.filter(item => !item.footer), ...footer]
         drawing.ink = p.spec.ink
+        drawing.showLanes = p.spec.showLanes
         drawing.buildingLimit = p.spec.buildingLimit
         p.spec = drawing
       } else addLocalRoads(p, selectLocalRoads(p.spec, p.geo.place, roads, street), street)
@@ -492,6 +495,7 @@ function revised(old: Project, geo: Geography, name: string): Project {
     original = layout(old.geo!, old.name)
   const previous = new Map(original.items.map((i) => [i.id, i])),
     edits = new Map(old.spec.items.map((i) => [i.id, i]))
+  p.spec.showLanes = old.spec.showLanes
   p.spec.buildingLimit = old.spec.buildingLimit
   p.spec.ink = old.spec.ink
   p.spec.items = p.spec.items.map((i) =>
@@ -776,8 +780,16 @@ function syncMapControls() {
     ranges.add(saved)
   }
   ranges.value = value
+  field('show-lanes').checked = current.spec.showLanes === true
   sel('building-limit').value = String(current.spec.buildingLimit ?? 'auto')
 }
+field('show-lanes').onchange = action(async () => {
+  const p = structuredClone(current)
+  p.spec.showLanes = field('show-lanes').checked
+  p.review = pending()
+  await modify(p)
+  status(p.spec.showLanes ? '골목길을 표시했습니다.' : '골목길을 숨겼습니다.')
+})
 sel('building-limit').onchange = action(async () => {
   const p = structuredClone(current)
   const value = sel('building-limit').value
@@ -803,6 +815,7 @@ sel('map-radius').onchange = action(async signal => {
     p.lastSuccessfulFetchAt = cached?.lastSuccessfulFetchAt ?? seed?.fetchedAt ?? datasetAt
     p.expiresAt = iso(Date.parse(p.lastSuccessfulFetchAt) + DAY)
     p.spec.ink = current.spec.ink
+    p.spec.showLanes = current.spec.showLanes
     p.spec.buildingLimit = current.spec.buildingLimit
     p.spec.items = [...p.spec.items.filter(i => !i.footer), ...structuredClone(current.spec.items.filter(i => i.footer))]
     if (seed) await seedGeography(geo, seed.fetchedAt)
@@ -952,8 +965,8 @@ async function downloadPrintFiles(signal: AbortSignal): Promise<void> {
     '전체 140 × 144 mm, 지도만 140 × 114 mm. PNG 600 dpi, 인쇄용 벡터 PDF 1쪽.',
     '편집용 SVG 글꼴: Noto Serif CJK KR / Noto Sans CJK KR. 글꼴이 없는 기기에서는 윤곽선 SVG를 사용하세요.',
     el('meta').textContent,
-    current.spec.items.some(i => i.kind === 'line' && i.id.startsWith('local-'))
-      ? '가는 실선은 골목·작은 도로, 점선은 공개 자료의 보행로입니다. 보행 경로 안내와 실제 출입구는 별도 확인이 필요합니다.' : '',
+    displayItems(current.spec).some(i => !i.hidden && i.kind === 'line' && i.id.startsWith('local-'))
+      ? (current.spec.showLanes ? '가는 실선은 골목길입니다. ' : '') + '점선은 공개 자료의 보행로입니다. 보행 경로 안내와 실제 출입구는 별도 확인이 필요합니다.' : '',
     current.origin === 'osm'
       ? '약도 그림을 청첩장에 배치할 때 지도 출처를 함께 표시하세요. 인쇄물은 약도 옆이나 출처란에 “지도 데이터 © OpenStreetMap contributors · openstreetmap.org/copyright”를 넣고, 웹에서는 “지도 데이터 © OpenStreetMap”에 https://www.openstreetmap.org/copyright 링크를 연결하세요.'
       : '',
