@@ -397,3 +397,14 @@ footer {
   display: none;
 }
 #fallback-info { padding: 1rem 0; }
+
+.map-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem 1.2rem;
+  align-items: end;
+  margin: 0 0 .8rem;
+}
+.map-controls label { margin: 0; color: var(--soft); }
+.map-controls select { display: block; margin-top: .25rem; }
+.quick-export { margin: .9rem 0; }

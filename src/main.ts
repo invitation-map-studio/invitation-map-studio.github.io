@@ -19,7 +19,7 @@ import {
 } from './model'
 import { addresses, buildingItems, exitLabels, fetchGeography, layout, selectLocalRoads, localRoadItems } from './geography'
 import { canonicalAddress, parseRoadAddress, mentionsVenue } from './road-address'
-import { render, serialize } from './render'
+import { displayItems, render, serialize } from './render'
 import {
   archive,
   archiveList,
@@ -133,6 +133,8 @@ function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 's
           '#search,#candidates,aside section:not(:first-child),#naver',
         )
       : document.querySelectorAll<HTMLElement>('#studio aside')
+    const previewControls = [el('map-controls'), el('quick-export'), field('maponly')]
+    for (const control of previewControls) control.inert = true
     const cancel = el(searching ? 'search-cancel' : 'cancel')
     cancel.hidden = false
     controls.forEach((control) => (control.inert = true))
@@ -160,6 +162,7 @@ function action(action: (s: AbortSignal) => Promise<void>, origin: 'search' | 's
       reviewButton.disabled = false
       reviewButton.textContent = '대조 기록 저장'
       controls.forEach((control) => (control.inert = false))
+      for (const control of previewControls) control.inert = false
       cancel.hidden = true
       if (searching) {
         el('search-submit').textContent = '주소로 약도 만들기'
@@ -228,7 +231,7 @@ function clearSearch() {
   el('candidates').replaceChildren()
 }
 el('search').addEventListener('input', clearSearch)
-const editable = () => current.spec.items.filter((i) => i.kind !== 'line')
+const editable = () => displayItems(current.spec).filter((i) => i.kind !== 'line')
 const item = () => current.spec.items.find((i) => i.id === selected)
 function fields() {
   const i = item()
@@ -253,6 +256,7 @@ function paint() {
   } else updateNaverMarker(el('naver-map'), markerPoint(current))
   clearFiles()
   el('paper').replaceChildren(render(current, field('maponly').checked, true))
+  syncMapControls()
   el('project-title').textContent = current.name
   el('project-address').textContent = current.address
   const type =
@@ -332,7 +336,7 @@ function paint() {
 async function library() {
   const list = (await projects()).sort((a, b) => b.lastAccessedAt.localeCompare(a.lastAccessedAt))
   sel('saved').replaceChildren(
-    ...list.map((p) => new Option(p.name + ' · ' + date(p.lastAccessedAt), p.id)),
+    ...list.map((p) => new Option([p.name, p.geo && p.geo.place.radius + ' m', date(p.lastAccessedAt)].filter(Boolean).join(' · '), p.id)),
   )
   sel('saved').value = current.id
   const area = el('archives')
@@ -426,6 +430,8 @@ async function use(p: Project, message: string, previous?: Project | null, arran
         const footer = p.spec.items.filter(item => item.footer)
         const drawing = layout(p.geo, p.name, roads)
         drawing.items = [...drawing.items.filter(item => !item.footer), ...footer]
+        drawing.ink = p.spec.ink
+        drawing.buildingLimit = p.spec.buildingLimit
         p.spec = drawing
       } else addLocalRoads(p, selectLocalRoads(p.spec, p.geo.place, roads, street), street)
     } catch {
@@ -486,6 +492,7 @@ function revised(old: Project, geo: Geography, name: string): Project {
     original = layout(old.geo!, old.name)
   const previous = new Map(original.items.map((i) => [i.id, i])),
     edits = new Map(old.spec.items.map((i) => [i.id, i]))
+  p.spec.buildingLimit = old.spec.buildingLimit
   p.spec.ink = old.spec.ink
   p.spec.items = p.spec.items.map((i) =>
     i.footer || sameItem(previous.get(i.id), i) ? (edits.get(i.id) ?? i) : i,
@@ -674,16 +681,16 @@ async function searchAddress(address: string, name: string, details: string, sig
   showCandidates(list, name, details)
 }
 async function makeAddress(place: Place, name: string, signal: AbortSignal, details: string,
-  fallback?: Geography, fetchedAt = datasetAt) {
+  fallback?: Geography, fetchedAt = datasetAt, radius = printRadius(place)) {
   setProgress('work', '주변 도로와 지하철 출구 조회 중')
   status('큰길과 주변 건물, 가까운 지하철역을 찾고 있습니다.')
   let seed
   try {
-    seed = await indexedRoads(place, signal)
+    seed = await indexedRoads(place, signal, radius)
   } catch (error) {
     if (signal.aborted) throw error
   }
-  const frame = seed?.geo.place ?? { ...place, radius: printRadius(place) }
+  const frame = seed?.geo.place ?? { ...place, radius }
   let geo = seed?.geo ?? (fallback && { ...fallback, place: frame })
   if (!geo && !(await savedGeography(frame))) {
     const roads = await localRoadsNear(frame, signal)
@@ -733,7 +740,7 @@ hook('refresh', (s) => {
   const place = current.geo!.place
   if (place.entrance === 'commercial-address' || ['mapped-building', 'named-landmark'].includes(place.entrance)) {
     const footer = current.spec.items.find(i => i.id === 'details')
-    return makeAddress(place, current.name, s, footer?.kind === 'text' ? footer.text : '', current.geo!)
+    return makeAddress(place, current.name, s, footer?.kind === 'text' ? footer.text : '', current.geo!, datasetAt, place.radius)
   }
   return make(place, current.name, true, s)
 }, '최신 도로 자료 조회 중')
@@ -754,6 +761,54 @@ sel('element').onchange = () => {
   selected = sel('element').value
   fields()
 }
+function syncMapControls() {
+  const place = current.geo?.place
+  el('map-controls').hidden = !place || current.spec.layout !== 'minimal'
+  if (!place) return
+  const ranges = sel('map-radius')
+  const auto = printRadius(place)
+  ranges.options[0].textContent = '자동 · ' + auto + ' m'
+  ranges.querySelector('[data-saved]')?.remove()
+  const value = place.radius === auto ? 'auto' : String(place.radius)
+  if (![...ranges.options].some(option => option.value === value)) {
+    const saved = new Option(place.radius + ' m', value)
+    saved.dataset.saved = 'true'
+    ranges.add(saved)
+  }
+  ranges.value = value
+  sel('building-limit').value = String(current.spec.buildingLimit ?? 'auto')
+}
+sel('building-limit').onchange = action(async () => {
+  const p = structuredClone(current)
+  const value = sel('building-limit').value
+  if (value === 'auto') delete p.spec.buildingLimit
+  else p.spec.buildingLimit = Number(value) as 0 | 2 | 4
+  p.review = pending()
+  await modify(p)
+  status('주변 건물 표시를 변경했습니다.')
+})
+sel('map-radius').onchange = action(async signal => {
+  try {
+    if (!current.geo) return
+    const place = current.geo.place
+    const value = sel('map-radius').value
+    const radius = value === 'auto' ? printRadius(place) : Number(value)
+    if (radius === place.radius) return
+    const frame = { ...place, radius }
+    const cached = await savedGeography(frame)
+    const seed = cached ? undefined : await indexedRoads(place, signal, radius)
+    signal.throwIfAborted()
+    const geo: Geography = cached?.geo ?? seed?.geo ?? { source:'osm', place:frame, roads:[], landmarks:[] }
+    const p = createProject(geo, current.name)
+    p.lastSuccessfulFetchAt = cached?.lastSuccessfulFetchAt ?? seed?.fetchedAt ?? datasetAt
+    p.expiresAt = iso(Date.parse(p.lastSuccessfulFetchAt) + DAY)
+    p.spec.ink = current.spec.ink
+    p.spec.buildingLimit = current.spec.buildingLimit
+    p.spec.items = [...p.spec.items.filter(i => !i.footer), ...structuredClone(current.spec.items.filter(i => i.footer))]
+    if (seed) await seedGeography(geo, seed.fetchedAt)
+    await use(p, radius + ' m 범위로 새 배치를 저장했습니다. 이전 편집본은 내 프로젝트에서 열 수 있습니다.', undefined, true)
+  } finally { syncMapControls() }
+}, 'studio', '새 범위로 약도 배치 중')
 field('maponly').onchange = () => {
   el('paper').replaceChildren(render(current, field('maponly').checked, true))
 }
@@ -949,6 +1004,23 @@ async function downloadPrintFiles(signal: AbortSignal): Promise<void> {
     status('파일을 생성했습니다. 기기 저장 공간이 부족하면 지금 ZIP을 다운로드해 주세요.', true)
   }
   if (await applyRoadCheck()) return downloadPrintFiles(signal)
+}
+for (const format of ['png', 'svg'] as const) {
+  const type = format.toUpperCase()
+  hook('save-' + format, async signal => {
+    const { exportPrintFile, fileBasename } = await import('./export')
+    const mapOnly = field('maponly').checked
+    await applyRoadCheck()
+    let file
+    do {
+      file = await exportPrintFile(serialize(current, mapOnly), format, mapOnly, signal)
+    } while (await applyRoadCheck())
+    signal.throwIfAborted()
+    clearFiles()
+    const name = fileBasename(current.name) + (mapOnly ? '_MapOnly.' : '_Map.') + format
+    link(file, name, el('downloads'), type + ' 다시 받기').click()
+    status(name + ' 파일을 생성했습니다.')
+  }, type + ' 파일 생성 중')
 }
 hook('download', downloadPrintFiles, '인쇄 파일 준비 중')
 hook('print-preview', async (signal) => {

@@ -21,6 +21,7 @@ export interface Spec {
   layout?: 'minimal'
   style?: 'vicinity' | 'neighborhood'
   captionVersion?: 2
+  buildingLimit?: 0 | 2 | 4
   items: Item[]
   ink: string
 }

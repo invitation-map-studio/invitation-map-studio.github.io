@@ -1,5 +1,5 @@
 import { destinationPath } from './symbols'
-import type { Item, Project } from './model'
+import type { Item, Project, Spec } from './model'
 const NS = 'http://www.w3.org/2000/svg'
 function svg(tag: string, attrs: Record<string, string | number> = {}) {
   const el = document.createElementNS(NS, tag)
@@ -73,6 +73,29 @@ function draw(item: Item, ink: string, legacyBus: boolean) {
   g.append(svg('circle', {cx: 0, cy: -37, r: 10, fill: '#fff'}))
   return g
 }
+function legacyBusMarks(spec: Spec) {
+  return new Set(spec.items.filter(i => i.kind === 'text' &&
+    i.id.startsWith('building-name-') && i.text.endsWith(' 정류장')).map(i => i.id.replace('building-name-', 'building-mark-')))
+}
+
+// The generator emits landmarks in priority order. A building's name and
+// symbol count as one place, even when one of them was hidden manually.
+export function displayItems(spec: Spec, buses = legacyBusMarks(spec)) {
+  if (spec.buildingLimit === undefined) return spec.items
+  const visible = new Set(spec.items.filter(i => !i.hidden).map(i => i.id))
+  const omit = new Set<string>()
+  let count = 0
+  for (const mark of spec.items) {
+    if (!mark.id.startsWith('building-mark-') || buses.has(mark.id)) continue
+    const name = mark.id.replace('building-mark-', 'building-name-')
+    if (mark.hidden && !visible.has(name)) continue
+    if (++count > spec.buildingLimit) {
+      omit.add(mark.id)
+      omit.add(name)
+    }
+  }
+  return spec.items.filter(i => !omit.has(i.id))
+}
 export function render(project: Project, mapOnly = false, interactive = false) {
   const height = mapOnly ? 1140 : 1440
   const root = svg('svg', {
@@ -82,9 +105,8 @@ export function render(project: Project, mapOnly = false, interactive = false) {
     role: 'img',
     'aria-label': mapOnly ? '오시는 길 약도' : project.name + ' 약도',
   })
-  const legacyBusMarks = new Set(project.spec.items.filter(i => i.kind === 'text' &&
-    i.id.startsWith('building-name-') && i.text.endsWith(' 정류장')).map(i => i.id.replace('building-name-', 'building-mark-')))
-  for (const item of project.spec.items) {
+  const buses = legacyBusMarks(project.spec)
+  for (const item of displayItems(project.spec, buses)) {
     if (item.hidden || (mapOnly && item.footer)) continue
     const isTitle = item.kind === 'text' && (item.id === 'ref-0' || item.id === 'title')
     const el = draw(
@@ -100,7 +122,7 @@ export function render(project: Project, mapOnly = false, interactive = false) {
                 : '확인 필요 시안 · 출입구 미확인',
           }
         : item,
-      project.spec.ink, legacyBusMarks.has(item.id),
+      project.spec.ink, buses.has(item.id),
     )
     if (interactive) el.setAttribute('data-item', item.id)
     root.append(el)

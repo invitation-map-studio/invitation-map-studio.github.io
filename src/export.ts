@@ -239,6 +239,16 @@ export async function sha256(blob: Blob): Promise<string> {
   return Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+const svgBlob = (svg: SVGSVGElement) =>
+  new Blob([serialize(svg)], { type: 'image/svg+xml;charset=utf-8' })
+
+export async function exportPrintFile(source: string, format: 'png' | 'svg', mapOnly: boolean, signal: AbortSignal) {
+  const height = mapOnly ? 114 : 144
+  const svg = await outlined(parseMap(source, height * 10), signal)
+  signal.throwIfAborted()
+  return format === 'svg' ? svgBlob(svg) : pngImage(svg, height, 600, ivory, signal)
+}
+
 export async function exportPreview(fullSvg: string, signal?: AbortSignal): Promise<Blob> {
   return pngImage(await outlined(parseMap(fullSvg, 1440), signal), 144, 150, ivory, signal)
 }
@@ -261,8 +271,6 @@ export async function exportMap(input: ExportInput, { signal, onProgress }: Expo
     archive[filename] = [bytes, { level: /\.(png|pdf)$/.test(filename) ? 0 : 6 }]
     onProgress?.(filename, files.size, 10)
   }
-  const svgBlob = (svg: SVGSVGElement) =>
-    new Blob([serialize(svg)], { type: 'image/svg+xml;charset=utf-8' })
   await add('_Map.svg', svgBlob(full))
   await add('_Map_Editable.svg', svgBlob(editable))
   await add('_MapOnly.svg', svgBlob(map))
