@@ -436,16 +436,19 @@ function destinationCaption(name: string, pin: Extract<Item, {radius: number}>,
     for (const typeSize of [size, Math.min(size,30), Math.min(size,24), 22]) {
       const half = textWidth(name,typeSize)/2
       const sides = [-1,1].map(side => [pin.x+side*(half+gap), head+typeSize*.35])
-      const below = [0,35,-35,55,-55].map(dx => [pin.x+dx, pin.y+typeSize+7])
+      const below = [0,24,-24,35,-35,55,-55].map(dx => [pin.x+dx, pin.y+typeSize+7])
       const above = [0,30,-30].map(dx => [pin.x+dx, pin.y-70])
       for (const [x,y] of [...sides, ...below, ...above]) {
         const title = placement(name,typeSize,x,y,0,streets,blocked)
         if (!title) continue
         const bounds = [...blocked,title.bounds]
-        for (const [rx,ry] of [[x,y-typeSize-8],[pin.x+70,pin.y-20],[pin.x-70,pin.y-20],[x,y+28]]) {
-          if (placement('도착지',20,rx,ry,0,streets,bounds))
-            return [label('venue',name,x,y,typeSize,{weight:700}),
-              label('venue-role','도착지',rx,ry,20,{font:'sans'})]
+        for (const roleSize of [20,16]) {
+          for (const [rx,ry] of [[x,y-typeSize-8],[pin.x+70,pin.y-20],[pin.x-70,pin.y-20],
+            [x,y+28],[pin.x+81,pin.y-38],[pin.x-81,pin.y-38]]) {
+            if (placement('도착지',roleSize,rx,ry,0,streets,bounds))
+              return [label('venue',name,x,y,typeSize,{weight:700}),
+                label('venue-role','도착지',rx,ry,roleSize,{font:'sans'})]
+          }
         }
       }
     }
@@ -893,7 +896,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], o
   const grid = orthogonal ? gridRoads(roads, project, access, addressStreet) : undefined
   if (grid) {
     spec.gridAngle = grid.angle
-    spec.gridRevision = 2
+    spec.gridRevision = 3
   }
   const transit = grid ? transitItems(place, true, true, grid.angle) : rawTransit
   const destination: Item = { ...baseItem('destination'), kind: 'flower', x: 700, y: 605, radius: 28 }
@@ -1060,7 +1063,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], o
   )
   let streetLabels = 0
   for (const street of ranked) {
-    if (streetLabels === 5) break
+    if (streetLabels === (grid ? 6 : 5)) break
     let chosen: Placement | undefined
     for (const seg of street.parts.slice(0, 10)) {
       if (seg.length < Math.min(60, textWidth(street.text, 25) * 0.38)) break

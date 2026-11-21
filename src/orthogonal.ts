@@ -1,6 +1,6 @@
 import { mapBounds as frame, type Point, type Road } from './model'
 import type { LocalRoad } from './local-roads'
-import type { StreetPath } from './carriageways'
+import { drawGridNetwork } from './grid-network'
 
 const center: Point = [700, 605]
 
@@ -20,7 +20,6 @@ type Axis = {
   along: 0 | 1
   cross: number
   spans: number[][]
-  nodes: Map<number,Point>
   cost: number
   local: boolean
 }
@@ -62,19 +61,18 @@ export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoa
     angle = Math.round(bearing/(Math.PI/2))*(Math.PI/2)-bearing
     best = cost
   }
-  const groups = new Map<string,{source:Source; edges:Edge[]; nodes:Map<number,Point>}>()
+  const groups = new Map<string,{source:Source; edges:Edge[]}>()
   for (const source of sources) {
     const points = source.points.map(p => gridPoint(p, angle))
     const parts = edges(points)
     if (!parts.length) continue
     const key=JSON.stringify([source.name || source.id,source.level,source.local])
-    const group=groups.get(key) ?? {source,edges:[],nodes:new Map<number,Point>()}
+    const group=groups.get(key) ?? {source,edges:[]}
     group.edges.push(...parts)
-    source.nodes.forEach((id, index) => group.nodes.set(id, points[index]))
     groups.set(key,group)
   }
   const axes:Axis[]=[]
-  for (const {source,edges:parts,nodes} of groups.values()) {
+  for (const {source,edges:parts} of groups.values()) {
     // A short turning lane nearest the venue can run across the street it belongs to.
     // Use the accumulated projected length of the street to find its main direction.
     const reach = [0, 0]
@@ -107,7 +105,7 @@ export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoa
     if (length<12 || cross<frame[across]+8 || cross>frame[across+2]-8) continue
     const cost=(addressStreet && source.name===addressStreet ? -2000:0) + main.near +
       majorRank(source.highway)*85 + (source.name ? 0 : 600) - Math.min(longest,850)*.32
-    axes.push({source,along,cross,spans,nodes,cost,local:source.local})
+    axes.push({source,along,cross,spans,cost,local:source.local})
   }
   const chosen:Axis[]=[]
   for (const axis of axes.sort((a,b)=>Number(a.local)-Number(b.local) || a.cost-b.cost || a.source.id-b.source.id)) {
@@ -118,40 +116,6 @@ export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoa
     if (crowded) continue
     chosen.push(axis)
   }
-  const paths:StreetPath[]=[]
-  for (const axis of chosen) {
-    const {source,along,cross,spans}=axis, across=1-along
-    const road = source
-    const otherAxes=chosen.filter(c=>(axis.local || !c.local) && c.along!==along && c.spans.some(([a,b])=>a-8<=cross && cross<=b+8))
-    for (const [a,b] of spans) {
-      const crossings = otherAxes.filter(c => c.cross >= a-8 && c.cross <= b+8).map(c => ({
-        axis: c,
-        joined: source.level === c.source.level && [...axis.nodes].some(([id, point]) =>
-          c.nodes.has(id) && Math.hypot(point[along]-c.cross, point[across]-cross) < 75),
-      }))
-      for (const offset of source.local ? [0] : [-7,7]) {
-        const at = cross + offset
-        const cuts = crossings.flatMap(({axis: other, joined}) => {
-          if (!joined && other.cost >= axis.cost) return []
-          // Open only the side with a branch at a T-junction.
-          if (joined && !other.spans.some(([lo,hi]) => offset < 0 ? lo < cross-8 && hi >= cross-8 :
-            hi > cross+8 && lo <= cross+8)) return []
-          const gap = joined ? 7 : 13
-          return [[other.cross-gap, other.cross+gap]]
-        }).sort((l,r) => l[0]-r[0])
-        let start = a
-        function stroke(end: number) {
-          if (end - start < 14) return
-          const points: Point[] = along === 0 ? [[start,at], [end,at]] : [[at,start], [at,end]]
-          paths.push({road, points})
-        }
-        for (const [lo,hi] of cuts) {
-          stroke(Math.min(lo,b))
-          start = Math.max(start,hi)
-        }
-        stroke(b)
-      }
-    }
-  }
+  const paths = drawGridNetwork(sources, chosen.map(axis => axis.source), p => gridPoint(p,angle))
   return {angle,paths}
 }

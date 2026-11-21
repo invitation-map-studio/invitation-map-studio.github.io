@@ -425,12 +425,25 @@ async function use(p: Project, message: string, previous?: Project | null, arran
   if (p.geo && !p.imported && p.spec.layout === 'minimal') {
     const signal = AbortSignal.timeout(7500)
     try {
-      const roads = await localRoadsNear(p.geo.place, busy ? AbortSignal.any([busy.signal, signal]) : signal)
+      const readSignal = busy ? AbortSignal.any([busy.signal, signal]) : signal
+      const grid = p.spec.gridAngle !== undefined
+      // Rotation can bring a connecting way just outside the geographic query into view.
+      const [roads, fringe] = await Promise.all([
+        localRoadsNear(p.geo.place, readSignal),
+        arrange && grid ? indexedRoads(p.geo.place, readSignal, p.geo.place.radius * 2).catch(() => undefined) : undefined,
+      ])
       const street = parseRoadAddress(p.address).street
       nextLayer = {id: p.id, roads, street}
       if (arrange) {
         const footer = p.spec.items.filter(item => item.footer)
-        const drawing = layout(p.geo, p.name, roads, p.spec.gridAngle !== undefined)
+        let geography = p.geo
+        if (fringe) {
+          const names = new Set(geography.roads.map(r => r.name).filter(Boolean))
+          const known = new Set(geography.roads.map(r => r.id))
+          const extra = fringe.geo.roads.filter(r => names.has(r.name) && !known.has(r.id))
+          geography = {...geography, roads:[...geography.roads,...extra]}
+        }
+        const drawing = layout(geography, p.name, roads, grid)
         drawing.items = [...drawing.items.filter(item => !item.footer), ...footer]
         drawing.ink = p.spec.ink
         drawing.showLanes = p.spec.showLanes
@@ -509,7 +522,7 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
   const grid = searching ? sel('search-format').value === 'grid' : current.spec.gridAngle !== undefined
   let old =
     (current.spec.gridAngle !== undefined) === grid && current.geo &&
-    (!searching || (current.spec.captionVersion === 2 && (!grid || current.spec.gridRevision === 2))) &&
+    (!searching || (current.spec.captionVersion === 2 && (!grid || current.spec.gridRevision === 3))) &&
     placeKey(current.geo.place) === placeKey(place) &&
     current.name === name &&
     (!searching || (footer?.kind === 'text' && footer.text === details))

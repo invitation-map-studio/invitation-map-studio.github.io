@@ -21,7 +21,7 @@ export type Item = { id: string; tone: Tone; footer: boolean; hidden: boolean } 
 export interface Spec {
   layout?: 'minimal'
   style?: 'vicinity' | 'neighborhood'
-  gridRevision?: 2
+  gridRevision?: 2 | 3
   gridAngle?: number
   captionVersion?: 2
   buildingLimit?: 0 | 2 | 4

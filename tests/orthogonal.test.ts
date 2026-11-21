@@ -43,3 +43,25 @@ test('같은 교차로에서 양쪽으로 뻗은 이름이 다른 도로는 함�
   const {paths} = gridRoads([west,east], p => p, [], west.name)
   assert.deepEqual(new Set(paths.map(p => p.road.name)), new Set([west.name,east.name]))
 })
+
+test('다리로 분류된 구간도 실제 양 끝 노드에서 같은 도로로 이어진다', () => {
+  const roads = [
+    {...road(1, [[160,580],[460,600]]), nodes:[1,2]},
+    {...road(2, [[460,600],[740,630]]), nodes:[2,3], level:'1/yes/'},
+    {...road(3, [[740,630],[1080,650]]), nodes:[3,4]},
+  ]
+  const {paths,angle} = gridRoads(roads,p => p,[],roads[0].name)
+  const bridgeX = gridPoint([600,615],angle)[0]
+  assert.equal(paths.filter(({points:[a,b]}) => a[1] === b[1] && a[0]<bridgeX && bridgeX<b[0]).length, 2)
+})
+
+test('같은 도로가 직각으로 꺾이는 곳은 두 외곽선이 각각 모서리에서 만난다', () => {
+  const bend = {...road(1,[[330,605],[700,605],[700,930]]), nodes:[1,2,3]}
+  const {paths} = gridRoads([bend],p => p,[],bend.name)
+  const horizontal = paths.filter(({points:[a,b]}) => a[1] === b[1])
+  const vertical = paths.filter(({points:[a,b]}) => a[0] === b[0])
+  assert.equal(horizontal.length,2)
+  assert.equal(vertical.length,2)
+  for (const h of horizontal)
+    assert.ok(vertical.some(v => v.points[0].every((n,i) => Math.abs(n-h.points[1][i])<.01)))
+})

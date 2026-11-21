@@ -48,7 +48,7 @@ export function importProject(raw: string): Project {
   )
     bad()
   const spec = record(p.spec, ['items', 'ink', 'layout', 'style', 'captionVersion', 'buildingLimit', 'showLanes', 'gridAngle', 'gridRevision'])
-  if (spec.gridRevision !== undefined && (spec.gridRevision !== 2 || spec.gridAngle === undefined)) bad()
+  if (spec.gridRevision !== undefined && (!choice(spec.gridRevision, 2, 3) || spec.gridAngle === undefined)) bad()
   if (spec.gridAngle !== undefined && (spec.layout !== 'minimal' || !num(spec.gridAngle,-Math.PI/4-.00001,Math.PI/4+.00001))) bad()
   if (spec.showLanes !== undefined && typeof spec.showLanes !== 'boolean') bad()
   if (spec.buildingLimit !== undefined && !choice(spec.buildingLimit, 0, 2, 4)) bad()
