@@ -75,14 +75,22 @@ export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoa
   }
   const axes:Axis[]=[]
   for (const {source,edges:parts,nodes} of groups.values()) {
-    const sorted=parts.sort((a,b)=>a.near-b.near)
-    const main=sorted.find(e=>e.length>=10) ?? sorted[0]
-    const along = Math.abs(main.b[0]-main.a[0]) >= Math.abs(main.b[1]-main.a[1]) ? 0 : 1
+    // A short turning lane nearest the venue can run across the street it belongs to.
+    // Use the accumulated projected length of the street to find its main direction.
+    const reach = [0, 0]
+    for (const {a,b,near} of parts) {
+      const dx = Math.abs(b[0]-a[0]), dy = Math.abs(b[1]-a[1])
+      const direction = dx >= dy ? 0 : 1
+      reach[direction] += Math.abs(dx-dy) / (1 + near/450)
+    }
+    const along = reach[0] >= reach[1] ? 0 : 1
     const across = 1-along
-    const mid=(main.a[across]+main.b[across])/2
-    const aligned=sorted.filter(e=>Math.abs(e.a[along]-e.b[along])>=Math.abs(e.a[across]-e.b[across]) &&
-      Math.abs((e.a[across]+e.b[across])/2-mid)<75)
-    if (!aligned.length) continue
+    const parallel = parts.filter(({a,b}) => Math.abs(a[along]-b[along]) >= Math.abs(a[across]-b[across]))
+      .sort((a,b) => a.near-b.near)
+    if (!parallel.length) continue
+    const main = parallel.find(e => e.length >= 10) ?? parallel[0]
+    const mid = (main.a[across]+main.b[across])/2
+    const aligned = parallel.filter(e => Math.abs((e.a[across]+e.b[across])/2-mid) < 90)
     const weights=aligned.map(e=>Math.min(e.length,130)/(1+e.near*.012)**2)
     const cross=aligned.reduce((n,e,i)=>n+weights[i]*(e.a[across]+e.b[across])/2,0)/weights.reduce((a,b)=>a+b)
     const spans:number[][]=[]
@@ -94,16 +102,20 @@ export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoa
       else spans.push([a,b])
     }
     const length=spans.reduce((n,[a,b])=>n+b-a,0)
+    const longest = Math.max(...spans.map(([a,b]) => b-a))
+    if (!source.local && source.name !== addressStreet && longest < 80) continue
     if (length<12 || cross<frame[across]+8 || cross>frame[across+2]-8) continue
     const cost=(addressStreet && source.name===addressStreet ? -2000:0) + main.near +
-      majorRank(source.highway)*120 + (source.name ? 0 : 600) - Math.min(length,850)*.18
+      majorRank(source.highway)*85 + (source.name ? 0 : 600) - Math.min(longest,850)*.32
     axes.push({source,along,cross,spans,nodes,cost,local:source.local})
   }
   const chosen:Axis[]=[]
   for (const axis of axes.sort((a,b)=>Number(a.local)-Number(b.local) || a.cost-b.cost || a.source.id-b.source.id)) {
-    if (chosen.filter(c=>c.local===axis.local).length >= (axis.local?2:4)) continue
+    if (chosen.filter(c=>c.local===axis.local).length >= (axis.local?2:8)) continue
     if (chosen.some(c=>c.source.name && c.source.name===axis.source.name)) continue
-    if (chosen.some(c=>c.along===axis.along && Math.abs(c.cross-axis.cross)<(axis.local?15:65))) continue
+    const crowded = chosen.some(c => c.along === axis.along && Math.abs(c.cross-axis.cross) < (axis.local ? 15 : 63) &&
+      c.spans.some(([a,b]) => axis.spans.some(([x,y]) => Math.min(b,y) - Math.max(a,x) > 35)))
+    if (crowded) continue
     chosen.push(axis)
   }
   const paths:StreetPath[]=[]
@@ -112,28 +124,33 @@ export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoa
     const road = source
     const otherAxes=chosen.filter(c=>(axis.local || !c.local) && c.along!==along && c.spans.some(([a,b])=>a-8<=cross && cross<=b+8))
     for (const [a,b] of spans) {
-      const cuts = otherAxes.filter(c=>c.cross>=a-8 && c.cross<=b+8).flatMap(c=>{
-        const joined = axis.source.level === c.source.level && [...axis.nodes].some(([id, point]) =>
-          c.nodes.has(id) && Math.hypot(point[along] - c.cross, point[across] - cross) < 75)
-        // A schematic crossing alone is not evidence of an at-grade intersection.
-        if (!joined && c.cost>=axis.cost) return []
-        const gap=joined ? 7 : 13
-        return [[c.cross-gap,c.cross+gap]]
-      }).sort((l,r)=>l[0]-r[0])
-      let start=a
-      function stroke(from:number,to:number) {
-        if (to - from < 14) return
-        for (const offset of source.local?[0]:[-7,7]) {
-          const at = cross + offset
-          const points: Point[] = along === 0 ? [[from,at], [to,at]] : [[at,from], [at,to]]
+      const crossings = otherAxes.filter(c => c.cross >= a-8 && c.cross <= b+8).map(c => ({
+        axis: c,
+        joined: source.level === c.source.level && [...axis.nodes].some(([id, point]) =>
+          c.nodes.has(id) && Math.hypot(point[along]-c.cross, point[across]-cross) < 75),
+      }))
+      for (const offset of source.local ? [0] : [-7,7]) {
+        const at = cross + offset
+        const cuts = crossings.flatMap(({axis: other, joined}) => {
+          if (!joined && other.cost >= axis.cost) return []
+          // Open only the side with a branch at a T-junction.
+          if (joined && !other.spans.some(([lo,hi]) => offset < 0 ? lo < cross-8 && hi >= cross-8 :
+            hi > cross+8 && lo <= cross+8)) return []
+          const gap = joined ? 7 : 13
+          return [[other.cross-gap, other.cross+gap]]
+        }).sort((l,r) => l[0]-r[0])
+        let start = a
+        function stroke(end: number) {
+          if (end - start < 14) return
+          const points: Point[] = along === 0 ? [[start,at], [end,at]] : [[at,start], [at,end]]
           paths.push({road, points})
         }
+        for (const [lo,hi] of cuts) {
+          stroke(Math.min(lo,b))
+          start = Math.max(start,hi)
+        }
+        stroke(b)
       }
-      for (const [lo,hi] of cuts) {
-        stroke(start, Math.min(lo, b))
-        start = Math.max(start, hi)
-      }
-      stroke(start,b)
     }
   }
   return {angle,paths}

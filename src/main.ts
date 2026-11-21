@@ -508,7 +508,8 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
   const footer = current.spec.items.find((item) => item.id === 'details')
   const grid = searching ? sel('search-format').value === 'grid' : current.spec.gridAngle !== undefined
   let old =
-    (current.spec.gridAngle !== undefined) === grid && current.geo && (!searching || current.spec.captionVersion === 2) &&
+    (current.spec.gridAngle !== undefined) === grid && current.geo &&
+    (!searching || (current.spec.captionVersion === 2 && (!grid || current.spec.gridRevision === 2))) &&
     placeKey(current.geo.place) === placeKey(place) &&
     current.name === name &&
     (!searching || (footer?.kind === 'text' && footer.text === details))

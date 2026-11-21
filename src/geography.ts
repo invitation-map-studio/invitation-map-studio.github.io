@@ -430,6 +430,26 @@ function destinationCaption(name: string, pin: Extract<Item, {radius: number}>,
   if (size < 24) return []
   const width = textWidth(name,size), gap = 29
   const head = pin.y - 37
+  if (always) {
+    const blocked: Rect[] = [...occupied, [pin.x-pin.radius, pin.y-pin.radius*2.1, pin.x+pin.radius, pin.y+1]]
+    // Fit the name inside the destination block before cutting any street ink.
+    for (const typeSize of [size, Math.min(size,30), Math.min(size,24), 22]) {
+      const half = textWidth(name,typeSize)/2
+      const sides = [-1,1].map(side => [pin.x+side*(half+gap), head+typeSize*.35])
+      const below = [0,35,-35,55,-55].map(dx => [pin.x+dx, pin.y+typeSize+7])
+      const above = [0,30,-30].map(dx => [pin.x+dx, pin.y-70])
+      for (const [x,y] of [...sides, ...below, ...above]) {
+        const title = placement(name,typeSize,x,y,0,streets,blocked)
+        if (!title) continue
+        const bounds = [...blocked,title.bounds]
+        for (const [rx,ry] of [[x,y-typeSize-8],[pin.x+70,pin.y-20],[pin.x-70,pin.y-20],[x,y+28]]) {
+          if (placement('도착지',20,rx,ry,0,streets,bounds))
+            return [label('venue',name,x,y,typeSize,{weight:700}),
+              label('venue-role','도착지',rx,ry,20,{font:'sans'})]
+        }
+      }
+    }
+  }
   // Try adjacent blocks first. If a road needs a small gap, both captions
   // become reserved areas before road strokes or landmark labels are placed.
   for (const lines of [streets, []]) {
@@ -450,7 +470,7 @@ function destinationCaption(name: string, pin: Extract<Item, {radius: number}>,
 
 // Place the exit name on the map when space permits. The guide below the map
 // always includes the full name, including at crowded junctions.
-export function exitLabels(items: Item[], place: Place, streets: Segment[] = [], stacked = false): Item[] {
+export function exitLabels(items: Item[], place: Place, streets: Segment[] = [], stacked = false, grid = false): Item[] {
   const { occupied, segments } = obstacles(items)
   const result: Item[] = []
   for (const [index, stop] of stationsFor(place).entries()) {
@@ -467,10 +487,13 @@ export function exitLabels(items: Item[], place: Place, streets: Segment[] = [],
       const paired = items.some(i => i.id === 'venue-role') && pin?.kind === 'flower' &&
         distance([pin.x,pin.y], [marker.x,marker.y]) < 95
       const offsets = [[-side,-6],[side,-6],[0,48],[0,-52],[-side,-36],[side,-36],[-side,26],[side,26]]
+      if (grid) for (const extra of [18,32]) {
+        for (const dy of [-6,-36,26]) offsets.push([-side-extra,dy],[side+extra,dy])
+      }
       if (paired) offsets.unshift([0,58],[-side,40],[side,40])
       // At crowded pins the caption stays against its circle. Road ink is
       // clipped below when it would otherwise run through the station name.
-      const labelStreets = paired ? [] : streets
+      const labelStreets = paired && !grid ? [] : streets
       for (const [dx,dy] of offsets) {
         const x = marker.x+dx, y = marker.y+dy
         const upper = placement(station,28,x,y,0,labelStreets,occupied)
@@ -868,7 +891,10 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], o
   const rawTransit = transitItems(place, true, true)
   const access = selectLocalRoads({...spec, items:rawTransit}, place, nearby, addressStreet)
   const grid = orthogonal ? gridRoads(roads, project, access, addressStreet) : undefined
-  if (grid) spec.gridAngle = grid.angle
+  if (grid) {
+    spec.gridAngle = grid.angle
+    spec.gridRevision = 2
+  }
   const transit = grid ? transitItems(place, true, true, grid.angle) : rawTransit
   const destination: Item = { ...baseItem('destination'), kind: 'flower', x: 700, y: 605, radius: 28 }
   // Reserve station captions before drawing the street network or placing other names.
@@ -918,8 +944,10 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], o
     if (a) segments.push({a,b,length:distance(a,b),bounds:envelope([a,b])})
   }
   const labelStreets = [...streetsForLabels, ...segments]
-  const pairedVenue = destinationCaption(name, destination, transit, labelStreets, orthogonal)
-  const exits = exitLabels([destination, ...pairedVenue, ...transit], place, labelStreets, true)
+  const mainStreets = grid ? grid.paths.filter(({road}) => majorRoads.has(road.highway)).map(({points:[a,b]}) =>
+    ({a,b,length:distance(a,b),bounds:envelope([a,b])})) : labelStreets
+  const pairedVenue = destinationCaption(name, destination, transit, mainStreets, orthogonal)
+  const exits = exitLabels([destination, ...pairedVenue, ...transit], place, labelStreets, true, orthogonal)
   const captions = obstacles([...pairedVenue, ...exits]).occupied
   const sections = new Map<number,number>()
   const localIds = new Map(access.map(r=>[r.id,r]))
