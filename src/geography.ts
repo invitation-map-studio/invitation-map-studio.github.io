@@ -1,7 +1,7 @@
 import { streetCenterline, type StreetPath } from './carriageways'
 import type { LocalRoad } from './local-roads'
 import type { Building } from './buildings'
-import { mapBounds, stationsFor, transitItems } from './transit'
+import { mapBounds, scaleBarMeters, stationsFor, transitItems } from './transit'
 import { indexedAddresses } from './address-index'
 import { registeredPlaces, mapScale } from './location-check'
 import { parseRoadAddress, matchesRegion } from './road-address'
@@ -482,23 +482,30 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
     const meters = distance(point, [axes.cx, axes.cy]) * place.radius / 440
     const name = kind === 'stop' ? rawName.replace(/[.]/g,'·') + ' 정류장' : rawName
     return { id, name, kind, meters, point, key: normalizeName(name), score: meters + rank * 40 }
-  }).sort((a, b) => a.score - b.score || a.id.localeCompare(b.id))
+  }).sort((a, b) => Number(b.kind === 'stop') - Number(a.kind === 'stop') ||
+    (a.kind === 'stop' && b.kind === 'stop' ? a.meters - b.meters : a.score - b.score) || a.id.localeCompare(b.id))
   const result: Item[] = []
   const names = new Set<string>()
   const marked: Point[] = []
   const size = 24
   const extras = new Set<string>()
+  let shownStop: string | undefined
   for (const { id, name, point, key, kind, meters } of candidates) {
-    if (kind && (spec.style !== 'neighborhood' || extras.has(kind) || meters > (kind === 'shop' ? 110 : 145))) continue
+    if (kind === 'storefront' && (marked.length >= 4 || meters > 70)) continue
+    if (kind && (spec.style !== 'neighborhood' || (kind !== 'storefront' && extras.has(kind)) || meters > (kind === 'shop' ? 110 : 145))) continue
     if (id === place.id || names.has(key) || key === venueName ||
         (venueName.length >= 4 && key.includes(venueName))) continue
     const [x, y] = point
-    const mark: Rect = [x - 7, y - 7, x + 7, y + 7]
+    const bus = kind === 'stop'
+    const radius = bus ? 17 : 5
+    const pad = radius + 2
+    const mark: Rect = [x-pad,y-pad,x+pad,y+pad]
     if (!inside([mark[0], mark[1]]) || !inside([mark[2], mark[3]]) ||
         occupied.some(rect => overlap(rect, mark)) || marked.some(p => distance(point, p) < 95) ||
-        segments.some(seg => overlap(seg.bounds, mark) && clip(seg.a, seg.b, mark).length)) continue
-    const beside = textWidth(name, size) / 2 + 14
+        (!bus && segments.some(seg => overlap(seg.bounds, mark) && clip(seg.a, seg.b, mark).length))) continue
+    const beside = textWidth(name, size) / 2 + radius + 12
     const shift = textWidth(name, size) / 3
+    let captionPlaced = false
     for (const [dx, dy] of [[beside, 9], [-beside, 9], [0, -15], [0, 39],
       [-shift, -15], [shift, -15], [-shift, 39], [shift, 39],
       [beside,-12],[-beside,-12],[beside,30],[-beside,30],[0,-32],[0,52],
@@ -506,22 +513,32 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
       const position = placement(name, size, x + dx, y + dy, 0, segments, [...occupied, mark])
       if (!position) continue
       result.push(
-        { ...baseItem('building-mark-' + id), kind: 'dot', x, y, radius: 5 },
+        { ...baseItem((bus ? 'building-bus-mark-' : 'building-mark-') + id), kind: 'dot', x, y, radius },
         { ...label('building-name-' + id, name, position.x, position.y, size, { font: 'sans' }), tone: 'soft' },
       )
+      captionPlaced = true
       names.add(key)
       if (kind) extras.add(kind)
+      if (bus) shownStop = id
       marked.push(point)
       occupied.push(mark, position.bounds)
       break
+    }
+    if (bus && !captionPlaced) {
+      // The stop can sit directly on a road, or have no space for an adjacent caption.
+      result.push({...baseItem('building-bus-mark-' + id), kind:'dot', x, y, radius})
+      extras.add('stop')
+      shownStop = id
+      marked.push(point)
+      occupied.push(mark)
     }
     if (marked.length === (spec.style === 'neighborhood' ? 6 : 4)) break
   }
   if (spec.style === 'neighborhood' && !spec.items.some(i => i.id === 'transit-guide-B' || i.id === 'building-bus-guide')) {
     const nearest = candidates.filter(p => p.kind === 'stop' && p.meters <= 180)
-      .sort((a,b) => a.meters - b.meters)[0]
+      .sort((a,b) => Number(b.id === shownStop) - Number(a.id === shownStop) || a.meters - b.meters)[0]
     if (nearest) result.push(label('building-bus-guide',
-      nearest.name + '  ·  목적지까지 직선 약 ' + Math.round(nearest.meters/10)*10 + 'm',
+      nearest.name + '  ·  목적지까지 직선 약 ' + Math.round(nearest.meters/10)*10 + 'm' + (inside(nearest.point) ? '' : '  ·  지도 밖'),
       700, spec.items.some(i => i.id === 'transit-guide-A') ? 1123 : 1085, 24, {font:'sans'}))
   }
   return result
@@ -571,7 +588,7 @@ export function selectLocalRoads(spec: Spec, place: Place, roads: LocalRoad[], s
     const take = (entries: typeof ranked, limit: number) => {
       for (const {road} of entries.slice(0, limit)) selected.set(road.id, road)
     }
-    take(ranked.filter(r => r.road.name === street && street && r.meters <= place.radius), 3)
+    take(ranked.filter(r => r.road.name === street && street && r.meters <= place.radius * 1.74), 3)
     take(ranked.filter(r => !r.road.foot && r.meters <= 95), 1)
     take(ranked.filter(r => r.road.foot && r.meters <= 65), 1)
   }
@@ -693,6 +710,12 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
     axes.cy - (lat - place.lat) * axes.y,
   ]
   const items: Item[] = [label('title', '오시는 길', 700, 95, 30, { spacing: 4 })]
+  const barEnd = mapBounds[2], barStart = barEnd - scaleBarMeters * scale
+  items.push(
+    label('scale-caption', scaleBarMeters + ' m', (barStart+barEnd)/2, 93, 22, {font:'sans'}),
+    {...baseItem('scale-bar','soft'), kind:'line', width:2.4,
+      points:[[barStart,102],[barStart,111],[barEnd,111],[barEnd,102]]},
+  )
   const roads = geo.roads.filter(road => majorRoads.has(road.highway))
   // A shared node with three distinct branches is a junction. A bend, way split,
   // or crossing on another level is not. Preserve these nodes during simplification.

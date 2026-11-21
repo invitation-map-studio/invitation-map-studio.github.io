@@ -1,5 +1,5 @@
 import { gunzipSync, strFromU8 } from 'fflate'
-import { stationRadius } from './transit'
+import { printRadius } from './transit'
 import type { Geography, Place, Road } from './model'
 
 type Row = [number, number, string, string, string, [number, number, number][], number?, ([number, number, string][])?]
@@ -26,7 +26,7 @@ async function read(path: string, signal: AbortSignal) {
 export async function indexedRoads(place: Place, signal: AbortSignal) {
   const index: Index = await (await read('index.json', signal)).json()
   const metersX = 111320 * Math.cos(place.lat * Math.PI / 180)
-  const radius = stationRadius(place)
+  const radius = printRadius(place)
   const available = new Set(index.tiles)
   const tiles: string[] = []
   const lonDelta = radius * 1.43 / metersX, latDelta = radius * 1.02 / 111320

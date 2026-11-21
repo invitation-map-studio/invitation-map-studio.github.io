@@ -1,7 +1,8 @@
+import { destinationPath } from './symbols'
 import { setProgress } from './progress'
 import { compareNaverAddress } from './location-check'
 import type { Point } from './model'
-import { nearbyStations } from './transit'
+import { closeMapZoom, nearbyStations } from './transit'
 type RoadReference = (address: string, point: Point) => void
 interface AddressResult {
   roadAddress?: string
@@ -14,8 +15,8 @@ interface MapInstance {
 }
 interface NaverMaps {
   LatLng: new (latitude: number, longitude: number) => object
-  Map: new (area: HTMLElement, options: { center: object; zoom: number }) => MapInstance
-  Marker: new (options: { position: object; map: MapInstance; title?: string }) => { setMap(map: null): void }
+  Map: new (area: HTMLElement, options: { center: object; zoom: number; scaleControl: boolean }) => MapInstance
+  Marker: new (options: { position: object; map: MapInstance; title?: string; icon: {content: string; anchor: {x:number; y:number}} }) => { setMap(map: null): void }
   Service: {
     Status: { OK: unknown }
     geocode(
@@ -195,12 +196,17 @@ export async function showNaver(
       current.disposeMap?.()
       const point = new maps.LatLng(Number(item.y), Number(item.x))
       area.hidden = false
-      const map = new maps.Map(area, { center: point, zoom: 17 })
-      const marker = new maps.Marker({ position: point, map, title: item.roadAddress || item.jibunAddress })
+      const map = new maps.Map(area, { center: point, zoom: closeMapZoom, scaleControl: true })
+      const marker = new maps.Marker({ position: point, map, title: item.roadAddress || item.jibunAddress,
+        icon: {anchor:{x:12,y:32}, content:
+          `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="-22 -59 44 59"><path d="${destinationPath}" fill="#282626"/><circle cx="0" cy="-37" r="10" fill="white"/></svg>`},
+      })
       const coords: Point = [Number(item.x), Number(item.y)]
       const [stop] = nearbyStations({ lon: coords[0], lat: coords[1] }, true)
       const stationMarker = stop && new maps.Marker({
         position: new maps.LatLng(stop.lat, stop.lon), map, title: stop.name,
+        icon: {anchor:{x:9,y:9}, content:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="white" stroke="#282626" stroke-width="2"/></svg>'},
       })
       current.disposeMap = () => {
         stationMarker?.setMap(null)

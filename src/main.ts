@@ -35,7 +35,7 @@ import {
   snapshots,
 } from './store'
 import { importProject } from './validate'
-import { stationRadius, transitItems } from './transit'
+import { printRadius, transitItems } from './transit'
 import { buildingsNear } from './buildings'
 import { commercialAddresses } from './address-index'
 import { buildingsAtReference } from './footprints'
@@ -89,7 +89,7 @@ function createProject(geo: Geography | null, name: string, details = ''): Proje
   }
 }
 function sample74() {
-  const p = createProject({ ...knownGeo, place: { ...knownGeo.place, radius: stationRadius(knownGeo.place) } }, fixture.name)
+  const p = createProject({ ...knownGeo, place: { ...knownGeo.place, radius: printRadius(knownGeo.place) } }, fixture.name)
   p.lastSuccessfulFetchAt = fixture.fetchedAt
   p.expiresAt = iso(Date.parse(fixture.fetchedAt) + DAY)
   return p
@@ -311,6 +311,7 @@ function paint() {
             : i.kind === 'flower'
               ? '목적지 표식'
               : i.id.startsWith('transit-stop-') ? '역 표식 ' + i.id.slice(-1)
+              : i.id.startsWith('building-bus-mark-') ? '버스 정류장 표식'
               : i.id.startsWith('building-mark-') ? (buildingNames.get(i.id) ?? '건물') + ' 표식'
               : i.id.startsWith('junction-') ? '교차로 표식' : '시설 점 ' + i.id,
           i.id,
@@ -434,7 +435,7 @@ async function use(p: Project, message: string, previous?: Project | null, arran
       !p.spec.items.some(item => item.id.startsWith('building-'))) {
     const place = p.geo.place
     const prior = previous?.geo && placeKey(previous.geo.place) === placeKey(place) ? previous : undefined
-    const buildings = await buildingsNear(place).catch(() => undefined)
+    const buildings = await buildingsNear(place, true).catch(() => undefined)
     if (buildings) {
       const additions = buildingItems(p.spec, place, p.name, buildings)
       if (prior?.geo) {
@@ -681,7 +682,7 @@ async function makeAddress(place: Place, name: string, signal: AbortSignal, deta
   } catch (error) {
     if (signal.aborted) throw error
   }
-  const frame = seed?.geo.place ?? { ...place, radius: stationRadius(place) }
+  const frame = seed?.geo.place ?? { ...place, radius: printRadius(place) }
   let geo = seed?.geo ?? (fallback && { ...fallback, place: frame })
   if (!geo && !(await savedGeography(frame))) {
     const roads = await localRoadsNear(frame, signal)

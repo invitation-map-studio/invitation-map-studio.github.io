@@ -49,7 +49,11 @@ for obj in reader:
         continue
     kind = ('stop' if t.get('highway') == 'bus_stop' else
             'shop' if t.get('shop') == 'convenience' else None)
-    rank = 2 if kind else priority(t)
+    if not kind and (t.get('amenity') in ('restaurant', 'cafe', 'pharmacy') or t.get('shop') == 'bakery'):
+        floor = t.get('addr:floor', '')
+        if floor in ('', '1', '1층', '지상1층', '지상 1층') and not t.get('indoor'):
+            kind = 'storefront'
+    rank = 6 if kind == 'storefront' else 2 if kind else priority(t)
     if rank is None or len(name) < 2 or len(name) > 48 or name.isdecimal():
         continue
     if obj.is_node():

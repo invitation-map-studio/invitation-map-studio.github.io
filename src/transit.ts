@@ -41,15 +41,15 @@ export function stationsFor(place: Place, numbered = true): Stop[] {
   })) ?? nearbyStations(place, numbered)
 }
 
-// Keep station labels within the same projection as the roads and the venue.
-export function stationRadius(place: Place) {
-  const first = stationsFor(place)[0]
-  // Fit the nearest entrance with room for its caption. A distant station belongs
-  // in the guide, so it should never stretch the frame beyond the neighbourhood.
-  if (!first) return 245
-  const east = Math.abs(first.lon - place.lon) * 111320 * Math.cos(place.lat * Math.PI / 180)
-  const north = Math.abs(first.lat - place.lat) * 111320
-  return Math.ceil(Math.min(260, Math.max(155, east / 1.12, north * 1.28)))
+export const closeMapZoom = 18
+export const scaleBarMeters = 30
+
+// Match the ground resolution of the Naver reference view at the document's
+// native 140 mm print width. One SVG unit is 0.1 mm (96 CSS px per inch).
+export function printRadius(place: Pick<Place, 'lat'>) {
+  const metersPerPixel = 2 * Math.PI * 6378137 * Math.cos(place.lat * Math.PI / 180) /
+    (256 * 2 ** closeMapZoom)
+  return Math.round(440 * .1 * 96 / 25.4 * metersPerPixel)
 }
 
 export function transitItems(place: Place, numbered = true, vicinity = false): Item[] {

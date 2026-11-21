@@ -1,3 +1,4 @@
+import { destinationPath } from './symbols'
 import type { Item, Project } from './model'
 const NS = 'http://www.w3.org/2000/svg'
 function svg(tag: string, attrs: Record<string, string | number> = {}) {
@@ -5,7 +6,19 @@ function svg(tag: string, attrs: Record<string, string | number> = {}) {
   for (const [key, val] of Object.entries(attrs)) el.setAttribute(key, String(val))
   return el
 }
-function draw(item: Item, ink: string, vicinity: boolean) {
+// Front-facing bus pictogram; the given point is the centre of its printed symbol.
+function busSymbol(x: number, y: number, radius: number, ink: string) {
+  const g = svg('g', {transform: `translate(${x} ${y}) scale(${radius/17})`, fill: ink})
+  g.append(svg('rect', {x:-15,y:-17,width:30,height:31,rx:6,stroke:'white','stroke-width':2}),
+    svg('rect', {x:-11,y:-10,width:22,height:13,rx:2,fill:'white'}),
+    svg('rect', {x:-6,y:-14,width:12,height:2,rx:1,fill:'white'}))
+  for (const side of [-1,1]) {
+    g.append(svg('circle',{cx:side*9,cy:8,r:2.2,fill:'white'}),
+      svg('rect',{x:side*9-2.5,y:12,width:5,height:5,rx:1.5}))
+  }
+  return g
+}
+function draw(item: Item, ink: string, legacyBus: boolean) {
   const fill = { ink, soft: '#686163', line: '#b9b1ad' }[item.tone]
   if (item.kind === 'line')
     return svg('path', {
@@ -28,19 +41,25 @@ function draw(item: Item, ink: string, vicinity: boolean) {
     })
     el.textContent = item.text
     if (item.angle) el.setAttribute('transform', `rotate(${item.angle} ${item.x} ${item.y})`)
+    if (item.id === 'building-bus-guide' && item.text) {
+      const group = svg('g')
+      const width = Array.from(item.text).reduce((w,c) => w + (/\s/.test(c) ? .36 : /[a-zA-Z0-9]/.test(c) ? .62 : 1),0)*item.size
+      const left = item.anchor === 'start' ? item.x : item.x - width/(item.anchor === 'end' ? 1 : 2)
+      if (item.angle) {
+        group.setAttribute('transform', el.getAttribute('transform')!)
+        el.removeAttribute('transform')
+      }
+      group.append(busSymbol(left-19,item.y-item.size*.4,12,ink),el)
+      return group
+    }
     return el
   }
   if (item.kind === 'dot' && item.id.startsWith('transit-stop-')) {
-    if (vicinity) return svg('circle', {cx: item.x, cy: item.y, r: item.radius,
+    return svg('circle', {cx: item.x, cy: item.y, r: item.radius,
       fill: '#fff', stroke: ink, 'stroke-width': 2.8})
-    const g = svg('g', {transform: `translate(${item.x} ${item.y})`})
-    g.append(svg('circle', {r: item.radius, fill: ink, stroke: '#fff', 'stroke-width': 3}))
-    const letter = svg('text', {x: 0, y: 7, 'text-anchor': 'middle', 'font-size': 20,
-      'font-family': 'Noto Sans CJK KR', 'font-weight': 400, fill: '#fff'})
-    letter.textContent = item.id.slice('transit-stop-'.length)
-    g.append(letter)
-    return g
   }
+  if (item.kind === 'dot' && (legacyBus || item.id.startsWith('building-bus-mark-')))
+    return busSymbol(item.x,item.y,legacyBus ? Math.max(15,item.radius) : item.radius,ink)
   if (item.kind === 'dot' && item.id.startsWith('building-mark-'))
     return svg('rect', { x: item.x - item.radius, y: item.y - item.radius, width: 2 * item.radius,
       height: 2 * item.radius, rx: 1, fill })
@@ -49,15 +68,9 @@ function draw(item: Item, ink: string, vicinity: boolean) {
     transform: `translate(${item.x} ${item.y}) scale(${item.radius / 28})`,
     fill,
   })
-  if (vicinity && item.id === 'destination') {
-    // Anchor the tip at the measured venue point in the editor and all exports.
-    g.append(svg('path', {d: 'M0 0 C-5 -8 -20 -24 -20 -37 A20 20 0 1 1 20 -37 C20 -24 5 -8 0 0 Z'}))
-    g.append(svg('circle', {cx: 0, cy: -37, r: 10, fill: '#fff'}))
-    return g
-  }
-  for (let angle = 0; angle < 360; angle += 60)
-    g.append(svg('ellipse', { cx: 0, cy: -14.25, rx: 5, ry: 13.75, transform: `rotate(${angle})` }))
-  g.append(svg('circle', { r: 6 }))
+  // Historical files call the destination symbol "flower". Its anchor remains the tip.
+  g.append(svg('path', {d: destinationPath}))
+  g.append(svg('circle', {cx: 0, cy: -37, r: 10, fill: '#fff'}))
   return g
 }
 export function render(project: Project, mapOnly = false, interactive = false) {
@@ -69,6 +82,8 @@ export function render(project: Project, mapOnly = false, interactive = false) {
     role: 'img',
     'aria-label': mapOnly ? '오시는 길 약도' : project.name + ' 약도',
   })
+  const legacyBusMarks = new Set(project.spec.items.filter(i => i.kind === 'text' &&
+    i.id.startsWith('building-name-') && i.text.endsWith(' 정류장')).map(i => i.id.replace('building-name-', 'building-mark-')))
   for (const item of project.spec.items) {
     if (item.hidden || (mapOnly && item.footer)) continue
     const isTitle = item.kind === 'text' && (item.id === 'ref-0' || item.id === 'title')
@@ -85,7 +100,7 @@ export function render(project: Project, mapOnly = false, interactive = false) {
                 : '확인 필요 시안 · 출입구 미확인',
           }
         : item,
-      project.spec.ink, Boolean(project.spec.style),
+      project.spec.ink, legacyBusMarks.has(item.id),
     )
     if (interactive) el.setAttribute('data-item', item.id)
     root.append(el)
