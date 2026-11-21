@@ -69,8 +69,8 @@ for (const text of verifiedChecks) {
   label.append(box, text)
   el('review-checks').append(label)
 }
-function createProject(geo: Geography | null, name: string, details = ''): Project {
-  const spec = geo ? layout(geo, name) : (structuredClone(reference) as Spec)
+function createProject(geo: Geography | null, name: string, details = '', grid = false): Project {
+  const spec = geo ? layout(geo, name, [], grid) : (structuredClone(reference) as Spec)
   const detailLine = spec.items.find((item) => item.id === 'details')
   if (detailLine?.kind === 'text') detailLine.text = details
   return {
@@ -338,7 +338,7 @@ function paint() {
 async function library() {
   const list = (await projects()).sort((a, b) => b.lastAccessedAt.localeCompare(a.lastAccessedAt))
   sel('saved').replaceChildren(
-    ...list.map((p) => new Option([p.name, p.geo && p.geo.place.radius + ' m', date(p.lastAccessedAt)].filter(Boolean).join(' · '), p.id)),
+    ...list.map((p) => new Option([p.name, p.spec.gridAngle !== undefined && '직각형', p.geo && p.geo.place.radius + ' m', date(p.lastAccessedAt)].filter(Boolean).join(' · '), p.id)),
   )
   sel('saved').value = current.id
   const area = el('archives')
@@ -361,7 +361,7 @@ let roadLayer: RoadLayer | undefined
 let checkedRoads: { layer: RoadLayer; selected: LocalRoad[] } | undefined
 
 function addLocalRoads(p: Project, selected: LocalRoad[], street: string) {
-  if (!p.geo) return false
+  if (!p.geo || p.spec.gridAngle !== undefined) return false
   const additions = localRoadItems(p.spec, p.geo.place, selected, street, p.geo.roads)
   if (!additions.length) return false
   p.spec.items.unshift(...additions)
@@ -410,7 +410,7 @@ function compareAccessRoads(layer: RoadLayer, address: string, point: Point) {
 async function use(p: Project, message: string, previous?: Project | null, arrange = false) {
   setProgress('work', '약도 불러오는 중')
   p.spec.items = p.spec.items.filter(item => item.id !== 'scale-bar' && item.id !== 'scale-caption')
-  if (p.geo && !p.imported) {
+  if (p.geo && !p.imported && p.spec.gridAngle === undefined) {
     const guides = p.spec.items.filter(i => i.id.startsWith('transit-'))
     // Replace the original station-center layer only when its labels and pins are unedited.
     if (!guides.length || (!guides.some(i => i.id.startsWith('transit-exit-')) &&
@@ -430,7 +430,7 @@ async function use(p: Project, message: string, previous?: Project | null, arran
       nextLayer = {id: p.id, roads, street}
       if (arrange) {
         const footer = p.spec.items.filter(item => item.footer)
-        const drawing = layout(p.geo, p.name, roads)
+        const drawing = layout(p.geo, p.name, roads, p.spec.gridAngle !== undefined)
         drawing.items = [...drawing.items.filter(item => !item.footer), ...footer]
         drawing.ink = p.spec.ink
         drawing.showLanes = p.spec.showLanes
@@ -449,7 +449,7 @@ async function use(p: Project, message: string, previous?: Project | null, arran
     if (buildings) {
       const additions = buildingItems(p.spec, place, p.name, buildings)
       if (prior?.geo) {
-        const oldLayout = layout(prior.geo, prior.name)
+        const oldLayout = layout(prior.geo, prior.name, [], prior.spec.gridAngle !== undefined)
         const baseline = new Map(buildingItems(oldLayout, place, prior.name, buildings).map(i => [i.id, i]))
         const edits = new Map(prior.spec.items.map(i => [i.id, i]))
         p.spec.items.push(...additions.map(i => sameItem(baseline.get(i.id), i) ? edits.get(i.id) ?? i : i))
@@ -491,8 +491,9 @@ function sameItem(a: Item | undefined, b: Item) {
   return JSON.stringify(a) === JSON.stringify(b)
 }
 function revised(old: Project, geo: Geography, name: string): Project {
-  const p = createProject(geo, name),
-    original = layout(old.geo!, old.name)
+  const grid = old.spec.gridAngle !== undefined
+  const p = createProject(geo, name, '', grid),
+    original = layout(old.geo!, old.name, [], grid)
   const previous = new Map(original.items.map((i) => [i.id, i])),
     edits = new Map(old.spec.items.map((i) => [i.id, i]))
   p.spec.showLanes = old.spec.showLanes
@@ -505,8 +506,9 @@ function revised(old: Project, geo: Geography, name: string): Project {
 }
 async function make(place: Place, name: string, force: boolean, signal: AbortSignal, details = '') {
   const footer = current.spec.items.find((item) => item.id === 'details')
+  const grid = searching ? sel('search-format').value === 'grid' : current.spec.gridAngle !== undefined
   let old =
-    current.geo && (!searching || current.spec.captionVersion === 2) &&
+    (current.spec.gridAngle !== undefined) === grid && current.geo && (!searching || current.spec.captionVersion === 2) &&
     placeKey(current.geo.place) === placeKey(place) &&
     current.name === name &&
     (!searching || (footer?.kind === 'text' && footer.text === details))
@@ -525,7 +527,7 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
     const { snap, state } = result,
       changed = old && JSON.stringify(old.geo) !== JSON.stringify(snap.geo)
     const p =
-      old && changed ? revised(old, snap.geo, name) : (old ?? createProject(snap.geo, name, details))
+      old && changed ? revised(old, snap.geo, name) : (old ?? createProject(snap.geo, name, details, grid))
     p.lastSuccessfulFetchAt = snap.lastSuccessfulFetchAt
     p.expiresAt = snap.expiresAt
     p.imported = false
@@ -769,6 +771,7 @@ function syncMapControls() {
   const place = current.geo?.place
   el('map-controls').hidden = !place || current.spec.layout !== 'minimal'
   if (!place) return
+  sel('map-format').value = current.spec.gridAngle === undefined ? 'classic' : 'grid'
   const ranges = sel('map-radius')
   const auto = printRadius(place)
   ranges.options[0].textContent = '자동 · ' + auto + ' m'
@@ -799,6 +802,29 @@ sel('building-limit').onchange = action(async () => {
   await modify(p)
   status('주변 건물 표시를 변경했습니다.')
 })
+// A pair of saved versions keeps freehand edits in each coordinate system.
+sel('map-format').onchange = action(async () => {
+  try {
+    if (!current.geo) return
+    const grid = sel('map-format').value === 'grid'
+    if ((current.spec.gridAngle !== undefined) === grid) return
+    const suffix = ':alternate'
+    const sibling = current.id.endsWith(suffix) ? current.id.slice(0,-suffix.length) : current.id + suffix
+    const saved = (await projects()).find(p => p.id === sibling)
+    const message = grid ? '직각형 미니멀 약도입니다.' : '기존 약도입니다.'
+    if (saved) { await use(saved,message); return }
+    const p = createProject(current.geo,current.name,'',grid)
+    p.id = sibling
+    p.spec.ink = current.spec.ink
+    p.spec.showLanes = current.spec.showLanes
+    p.spec.buildingLimit = current.spec.buildingLimit
+    p.spec.items = [...p.spec.items.filter(i => !i.footer), ...structuredClone(current.spec.items.filter(i => i.footer))]
+    p.lastSuccessfulFetchAt = current.lastSuccessfulFetchAt
+    p.expiresAt = current.expiresAt
+    p.refreshFailed = current.refreshFailed
+    await use(p,message,undefined,true)
+  } finally { syncMapControls() }
+}, 'studio', '약도 형식 변경 중')
 sel('map-radius').onchange = action(async signal => {
   try {
     if (!current.geo) return
@@ -811,7 +837,7 @@ sel('map-radius').onchange = action(async signal => {
     const seed = cached ? undefined : await indexedRoads(place, signal, radius)
     signal.throwIfAborted()
     const geo: Geography = cached?.geo ?? seed?.geo ?? { source:'osm', place:frame, roads:[], landmarks:[] }
-    const p = createProject(geo, current.name)
+    const p = createProject(geo, current.name, '', current.spec.gridAngle !== undefined)
     p.lastSuccessfulFetchAt = cached?.lastSuccessfulFetchAt ?? seed?.fetchedAt ?? datasetAt
     p.expiresAt = iso(Date.parse(p.lastSuccessfulFetchAt) + DAY)
     p.spec.ink = current.spec.ink

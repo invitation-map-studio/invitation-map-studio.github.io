@@ -1,9 +1,10 @@
+import { gridPoint } from './orthogonal'
 import stationIndex from './stations.json'
 import venues from './venues.json'
 import { mapScale } from './location-check'
-import { baseItem, label, type Item, type Place } from './model'
+import { mapBounds, baseItem, label, type Item, type Place } from './model'
 
-export const mapBounds = [76, 160, 1324, 1045] as const
+export { mapBounds } from './model'
 
 type Stop = { name: string; lon: number; lat: number; directions?: string; line?: string }
 
@@ -55,13 +56,14 @@ export function printRadius(place: Place) {
   return Math.ceil(radius)
 }
 
-export function transitItems(place: Place, numbered = true, vicinity = false): Item[] {
+export function transitItems(place: Place, numbered = true, vicinity = false, angle?: number): Item[] {
   const stops = stationsFor(place, numbered)
   const axes = mapScale(place)
   const items: Item[] = []
   for (const [i, stop] of stops.entries()) {
-    const x = axes.cx + (stop.lon - place.lon) * axes.x
-    const y = axes.cy - (stop.lat - place.lat) * axes.y
+    const originalX = axes.cx + (stop.lon - place.lon) * axes.x
+    const originalY = axes.cy - (stop.lat - place.lat) * axes.y
+    const [x,y] = gridPoint([originalX,originalY],angle)
     const [left, top, right, bottom] = mapBounds
     const inMap = x >= left && x <= right && y >= top && y <= bottom
     if (vicinity && !inMap && i > 0 && !stop.directions) continue
@@ -73,14 +75,14 @@ export function transitItems(place: Place, numbered = true, vicinity = false): I
     }
     if (stop.directions) parts.push(stop.directions)
     else {
-      const meters = Math.hypot(x - axes.cx, y - axes.cy) * place.radius / 440
+      const meters = Math.hypot(originalX - axes.cx, originalY - axes.cy) * place.radius / 440
       if (stop.line) parts.push(stop.line)
       if (numbered && !stop.name.endsWith('번 출구')) parts.push('역 대표점 기준')
       parts.push('직선 약 ' + Math.round(meters / 10) * 10 + 'm')
     }
-    if (!inMap || (vicinity && !stop.directions && Math.hypot(x - axes.cx, y - axes.cy) * place.radius / 440 >= 20)) {
+    if (!inMap || (vicinity && !stop.directions && Math.hypot(originalX - axes.cx, originalY - axes.cy) * place.radius / 440 >= 20)) {
       const directions = ['동', '북동', '북', '북서', '서', '남서', '남', '남동']
-      const octant = Math.round(Math.atan2(axes.cy - y, x - axes.cx) / (Math.PI / 4))
+      const octant = Math.round(Math.atan2(axes.cy - originalY, originalX - axes.cx) / (Math.PI / 4))
       parts.push(inMap ? '목적지는 ' + directions[(12 + octant) % 8] + '쪽' :
         '지도 밖 ' + directions[(8 + octant) % 8] + '쪽')
     }

@@ -1,5 +1,6 @@
 export type Tone = 'ink' | 'soft' | 'line'
 export type Point = [number, number]
+export const mapBounds = [76, 160, 1324, 1045] as const
 export type Label = {
   kind: 'text'
   text: string
@@ -20,6 +21,7 @@ export type Item = { id: string; tone: Tone; footer: boolean; hidden: boolean } 
 export interface Spec {
   layout?: 'minimal'
   style?: 'vicinity' | 'neighborhood'
+  gridAngle?: number
   captionVersion?: 2
   buildingLimit?: 0 | 2 | 4
   showLanes?: boolean

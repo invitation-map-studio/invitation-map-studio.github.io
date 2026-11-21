@@ -1,3 +1,4 @@
+import { gridPoint, gridRoads } from './orthogonal'
 import { streetCenterline, type StreetPath } from './carriageways'
 import type { LocalRoad } from './local-roads'
 import type { Building } from './buildings'
@@ -421,9 +422,9 @@ function obstacles(items: Item[]) {
 
 // Give a pin and a nearby subway circle their own caption groups at print size.
 function destinationCaption(name: string, pin: Extract<Item, {radius: number}>,
-  transit: Item[], streets: Segment[]): Item[] {
+  transit: Item[], streets: Segment[], always = false): Item[] {
   const stops = transit.filter(stop => stop.kind === 'dot')
-  if (!stops.some(stop => stop.kind === 'dot' && distance([pin.x,pin.y], [stop.x,stop.y]) < 95)) return []
+  if (!always && !stops.some(stop => stop.kind === 'dot' && distance([pin.x,pin.y], [stop.x,stop.y]) < 95)) return []
   const {occupied} = obstacles(stops)
   const size = Math.min(37, Math.floor(620 / Math.max(1, textWidth(name,1))))
   if (size < 24) return []
@@ -514,10 +515,14 @@ export function buildingItems(spec: Spec, place: Place, venue: string, buildings
   const normalizeName = (name: string) => name.replace(/\s+/g, '').toLowerCase()
   const venueName = normalizeName(venue)
   const candidates = buildings.map(([id, rawName, lon, lat, rank, kind]) => {
-    const point: Point = [axes.cx + (lon - place.lon) * axes.x, axes.cy - (lat - place.lat) * axes.y]
-    const meters = distance(point, [axes.cx, axes.cy]) * place.radius / 440
+    const original: Point = [axes.cx + (lon - place.lon) * axes.x, axes.cy - (lat - place.lat) * axes.y]
+    const point = gridPoint(original,spec.gridAngle)
+    const meters = distance(original, [axes.cx, axes.cy]) * place.radius / 440
     const name = kind === 'stop' ? rawName.replace(/[.]/g,'·') + ' 정류장' : rawName
-    return { id, name, kind, meters, point, key: normalizeName(name), score: meters + rank * 40 }
+    const landmark = /(학교|아트홀|도서관|구청|시청|미술관|백화점)$/.test(name)
+    const score = spec.gridAngle === undefined ? meters + rank * 40 :
+      meters + rank * 175 - (landmark ? 270 : 0) + (kind && kind !== 'stop' ? 600 : 0)
+    return { id, name, kind, meters, point, key: normalizeName(name), score }
   }).sort((a, b) => Number(b.kind === 'stop') - Number(a.kind === 'stop') ||
     (a.kind === 'stop' && b.kind === 'stop' ? a.meters - b.meters : a.score - b.score) || a.id.localeCompare(b.id))
   const result: Item[] = []
@@ -827,7 +832,7 @@ function placeVenueName(name: string, items: Item[], segments: Segment[], occupi
 
 const majorRoads = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
 
-export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): Spec {
+export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], orthogonal = false): Spec {
   const { place } = geo,
     scale = 440 / place.radius
   const axes = mapScale(place)
@@ -857,70 +862,76 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
   const junctions = new Set(crossings.map(n => n.id))
   const segments: Segment[] = []
   const streets = new Map<string, { id: number; parts: Segment[] }>()
-  const transit = transitItems(place, true, true)
+  let addressStreet = ''
+  try { addressStreet = parseRoadAddress(place.address).street } catch { /* Legacy free-form address. */ }
+  const spec: Spec = {layout:'minimal', style:'neighborhood', captionVersion:2, ink:'#282626', items}
+  const rawTransit = transitItems(place, true, true)
+  const access = selectLocalRoads({...spec, items:rawTransit}, place, nearby, addressStreet)
+  const grid = orthogonal ? gridRoads(roads, project, access, addressStreet) : undefined
+  if (grid) spec.gridAngle = grid.angle
+  const transit = grid ? transitItems(place, true, true, grid.angle) : rawTransit
   const destination: Item = { ...baseItem('destination'), kind: 'flower', x: 700, y: 605, radius: 28 }
   // Reserve station captions before drawing the street network or placing other names.
   const streetsForLabels: Segment[] = []
-  const groups = new Map<string, StreetPath[]>()
-  for (const road of roads) {
-    const path = { road, points: simplify(road.points.map(project), road.nodes, junctions, (place.radius < 300 ? 4 : 10) * scale) }
-    const key = road.name ? JSON.stringify([road.name, road.level]) : String(road.id)
-    const group = groups.get(key) ?? []
-    group.push(path)
-    groups.set(key, group)
-  }
-  const simplified: StreetPath[] = []
-  const pad = 50 * scale
-  const extended: Rect = [box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad]
-  for (const paths of groups.values()) {
-    let center
-    const divided = paths.filter(p => p.road.oneWay && p.road.name)
-    const undivided = paths.filter(p => !p.road.oneWay || !p.road.name)
-    // Older saved close-ups use a single schematic axis. At invitation scale keep both mapped carriageways.
-    if (place.radius < 300 && divided.length > 1) {
-      const edges = divided.flatMap(({points}) => points.slice(1).flatMap((p,i) => {
-        const [a,b] = clip(points[i], p, extended)
-        return a && distance(a,b) > .1 ? [{a,b,length:distance(a,b)}] : []
-      }))
-      center = streetCenterline(edges, scale)
+  const simplified: StreetPath[] = grid?.paths ?? []
+  if (!grid) {
+    const groups = new Map<string, StreetPath[]>()
+    for (const road of roads) {
+      const path = { road, points: simplify(road.points.map(project), road.nodes, junctions, (place.radius < 300 ? 4 : 10) * scale) }
+      const key = road.name ? JSON.stringify([road.name, road.level]) : String(road.id)
+      const group = groups.get(key) ?? []
+      group.push(path)
+      groups.set(key, group)
     }
-    if (center) {
-      const endNodes = new Set(divided.flatMap(p => [p.road.nodes[0],p.road.nodes.at(-1)!]))
-      for (const {road} of undivided) for (const i of [0,road.nodes.length-1]) {
-        if (!endNodes.has(road.nodes[i])) continue
-        const point = project(road.points[i])
-        for (const j of [0,center.length-1])
-          if (distance(point,center[j]) < 45*scale) center[j] = point
+    const pad = 50 * scale
+    const extended: Rect = [box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad]
+    for (const paths of groups.values()) {
+      let center
+      const divided = paths.filter(p => p.road.oneWay && p.road.name)
+      const undivided = paths.filter(p => !p.road.oneWay || !p.road.name)
+      // Older saved close-ups use a single schematic axis. At invitation scale keep both mapped carriageways.
+      if (place.radius < 300 && divided.length > 1) {
+        const edges = divided.flatMap(({points}) => points.slice(1).flatMap((p,i) => {
+          const [a,b] = clip(points[i], p, extended)
+          return a && distance(a,b) > .1 ? [{a,b,length:distance(a,b)}] : []
+        }))
+        center = streetCenterline(edges, scale)
       }
-      simplified.push({road: divided[0].road, points: simplify(center, [], new Set(), 3 * scale), center:true}, ...undivided)
-    } else simplified.push(...paths)
+      if (center) {
+        const endNodes = new Set(divided.flatMap(p => [p.road.nodes[0],p.road.nodes.at(-1)!]))
+        for (const {road} of undivided) for (const i of [0,road.nodes.length-1]) {
+          if (!endNodes.has(road.nodes[i])) continue
+          const point = project(road.points[i])
+          for (const j of [0,center.length-1])
+            if (distance(point,center[j]) < 45*scale) center[j] = point
+        }
+        simplified.push({road: divided[0].road, points: simplify(center, [], new Set(), 3 * scale), center:true}, ...undivided)
+      } else simplified.push(...paths)
+    }
   }
   for (const {points} of simplified) for (let i=1; i<points.length; i++) {
     const a = points[i-1], b = points[i]
     if (clip(a,b).length) streetsForLabels.push({a,b,length:distance(a,b),bounds:envelope([a,b])})
   }
-  let addressStreet = ''
-  if (nearby.length) {
-    try { addressStreet = parseRoadAddress(place.address).street } catch { /* Legacy free-form address. */ }
-  }
-  const spec: Spec = {layout:'minimal', style:'neighborhood', captionVersion:2, ink:'#282626', items}
-  const access = selectLocalRoads({...spec, items:transit}, place, nearby, addressStreet)
-  for (const road of access) for (let i=1; i<road.points.length; i++) {
+  if (!grid) for (const road of access) for (let i=1; i<road.points.length; i++) {
     const [a,b] = clip(road.points[i-1], road.points[i])
     if (a) segments.push({a,b,length:distance(a,b),bounds:envelope([a,b])})
   }
   const labelStreets = [...streetsForLabels, ...segments]
-  const pairedVenue = destinationCaption(name, destination, transit, labelStreets)
+  const pairedVenue = destinationCaption(name, destination, transit, labelStreets, orthogonal)
   const exits = exitLabels([destination, ...pairedVenue, ...transit], place, labelStreets, true)
   const captions = obstacles([...pairedVenue, ...exits]).occupied
+  const sections = new Map<number,number>()
+  const localIds = new Map(access.map(r=>[r.id,r]))
   for (const { road, points, center } of simplified) {
-    let run: Point[] = [],
-      section = 0
+    const small = grid && !majorRoads.has(road.highway) ? localIds.get(road.id) : undefined
+    const prefix = small ? 'local-' + (road.name === addressStreet ? 'addr-' : '') + (small.foot?'foot-':'lane-') : 'road-'
+    let run: Point[] = [], section = sections.get(road.id) ?? 0
     function flush() {
       if (run.length > 1) {
-        const width = ['motorway', 'trunk', 'primary'].includes(road.highway) ? 5 : 3
+        const width = grid ? (small ? 2 : 4) : ['motorway', 'trunk', 'primary'].includes(road.highway) ? 5 : 3
         items.push({
-          ...baseItem('road-' + road.id + '-' + section++ + (center ? '-center' : ''), 'soft'),
+          ...baseItem(prefix + road.id + '-' + section++ + (center ? '-center' : ''), 'soft'),
           kind: 'line',
           width,
           points: run,
@@ -947,6 +958,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
       }
     }
     flush()
+    sections.set(road.id,section)
   }
 
   const occupied: Rect[] = [...captions, [673, 541, 727, 614]]
@@ -959,7 +971,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
   const usedJunctionNames = new Set<string>()
   crossings.sort((a, b) => Number(namedNodes.has('node/' + b.id)) - Number(namedNodes.has('node/' + a.id)) || b.mainStreets.size - a.mainStreets.size ||
     distance(a.point, [700, 605]) - distance(b.point, [700, 605]) || a.id - b.id)
-  for (const crossing of crossings) {
+  if (!grid) for (const crossing of crossings) {
     const title = namedNodes.get('node/' + crossing.id)
     if (title && usedJunctionNames.has(title)) continue
     let at = crossing.point
@@ -1051,7 +1063,7 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
       occupied.push(chosen.bounds)
       streetLabels++
       items.push(
-        label('street-' + street.id, street.text, chosen.x, chosen.y, 25, {
+        label((grid && localIds.has(street.id) ? (localIds.get(street.id)!.foot ? 'local-foot-name-' : 'local-street-name-') : 'street-') + street.id, street.text, chosen.x, chosen.y, 25, {
           font: 'sans',
           angle: chosen.angle,
         }),
@@ -1075,6 +1087,6 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = []): 
     { ...label('details', '', 700, 1320, 27), footer: true },
     { ...label('parking', '', 700, 1374, 25, { font: 'sans' }), footer: true },
   )
-  items.unshift(...localRoadItems(spec, place, access, addressStreet, roads))
+  if (!grid) items.unshift(...localRoadItems(spec, place, access, addressStreet, roads))
   return spec
 }

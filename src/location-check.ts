@@ -1,3 +1,4 @@
+import { gridPoint } from './orthogonal'
 import institutions from '../data/evaluation/addresses.json'
 import venues from './venues.json'
 import { laneLayerVisible, normalize, type Place, type Point, type Project } from './model'
@@ -16,7 +17,8 @@ export function markerPoint(project: Project): Point | undefined {
   const marker = project.spec.items.find(i => i.id === 'destination')
   if (!place || marker?.kind !== 'flower' || marker.hidden) return
   const scale = mapScale(place)
-  return [place.lon + (marker.x - scale.cx) / scale.x, place.lat - (marker.y - scale.cy) / scale.y]
+  const [x,y] = gridPoint([marker.x,marker.y], project.spec.gridAngle, true)
+  return [place.lon + (x - scale.cx) / scale.x, place.lat - (y - scale.cy) / scale.y]
 }
 
 function distanceMeters([lon, lat]: Point, [x, y]: Point) {

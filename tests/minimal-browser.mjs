@@ -13,6 +13,7 @@ const cases = [
   ['서울특별시 중구 세종대로 124 (태평로1가, 한국프레스센터 19~20층)', '한국프레스센터', '세종대로', '시청역', 'press'],
   ['서울특별시 강남구 학동로 519', '빌라드지디 청담', '학동로', '청담역 12번 출구', 'cheongdam'],
   ['서울특별시 강남구 테헤란로 610', '글래드호텔', '테헤란로', '삼성역', 'glad'],
+  ['서울특별시 강남구 봉은사로 637', '노블발렌티', '봉은사로', '봉은사역 4번 출구', 'noble'],
 ].filter(row => !onlyCase || row[4] === onlyCase)
 assert.ok(cases.length)
 try {
@@ -32,6 +33,7 @@ try {
         Service:{Status:{OK:1},geocode:({query},cb)=>{
           window.requests++
           const [x,y]=query.includes('세종대로')?['126.97785','37.56741']:
+            query.includes('봉은사로')?['127.06484','37.51533']:
             query.includes('학동로')?['127.05546','37.52019']:['127.06457','37.50886']
           cb(1,{v2:{status:'OK',addresses:[{roadAddress:query,x,y}]}})
         }}}}; window.onWeddingMapSdkReady()`}))
@@ -47,6 +49,7 @@ try {
     assert.equal(await legacyPin.locator('ellipse').count(), 0)
   }
   for (const [address, name, street, station, slug] of cases) {
+    await page.locator('#search-format').selectOption(slug === 'noble' ? 'grid' : 'classic')
     await page.locator('#address').fill(address)
     await page.locator('#search-submit').click()
     await page.locator('#project-title').filter({hasText:name}).waitFor({timeout:120000})
@@ -91,6 +94,38 @@ try {
       const caption = await paper.locator('[data-item="transit-exit-A"],[data-item="transit-number-A"]').allTextContents()
       assert.equal(caption.join(' '), station)
       assert.match(await paper.locator('[data-item="transit-guide-A"]').textContent(), /청담역 12번 출구.*7호선.*직선 약 40m/)
+    }
+    if (slug === 'noble') {
+      const format = page.locator('#map-format')
+      const idle = () => page.locator('#work-progress').waitFor({state:'hidden'})
+      const horizontalOrVertical = () => paper.locator('path[data-item^="road-"]').evaluateAll(paths =>
+        paths.length > 0 && paths.every(path => {
+          const p = path.getAttribute('d').match(/-?[\d.]+/g).map(Number)
+          for (let i = 2; i < p.length; i += 2)
+            if (Math.abs(p[i]-p[i-2]) > .01 && Math.abs(p[i+1]-p[i-1]) > .01) return false
+          return true
+        }))
+      assert.equal(await format.inputValue(), 'grid')
+      assert.equal(await horizontalOrVertical(), true)
+      const labels = await paper.locator('[data-item^="street-"]').allTextContents()
+      for (const label of ['봉은사로','영동대로']) assert.ok(labels.includes(label), label)
+      const gridId = await page.locator('#saved').inputValue()
+      await format.selectOption('classic')
+      await idle()
+      assert.equal(await horizontalOrVertical(), false)
+      assert.notEqual(await page.locator('#saved').inputValue(), gridId)
+      await page.locator('#building-limit').selectOption('0')
+      await idle()
+      await format.selectOption('grid')
+      await idle()
+      assert.equal(await page.locator('#saved').inputValue(), gridId)
+      assert.equal(await page.locator('#building-limit').inputValue(), 'auto')
+      assert.equal(await horizontalOrVertical(), true)
+      await format.selectOption('classic')
+      await idle()
+      assert.equal(await page.locator('#building-limit').inputValue(), '0')
+      await format.selectOption('grid')
+      await idle()
     }
     await page.locator('#download').click()
     const link = page.getByRole('link', {name:'전체 ZIP 다운로드'})

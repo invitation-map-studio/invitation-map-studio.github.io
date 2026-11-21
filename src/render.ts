@@ -82,7 +82,8 @@ function legacyBusMarks(spec: Spec) {
 // symbol count as one place, even when one of them was hidden manually.
 export function displayItems(spec: Spec, buses = legacyBusMarks(spec)) {
   const items = spec.items.filter(item => laneLayerVisible(spec, item))
-  if (spec.buildingLimit === undefined) return items
+  const limit = spec.buildingLimit ?? (spec.gridAngle === undefined ? Infinity : 3)
+  if (limit === Infinity) return items
   const visible = new Set(spec.items.filter(i => !i.hidden).map(i => i.id))
   const omit = new Set<string>()
   let count = 0
@@ -90,7 +91,7 @@ export function displayItems(spec: Spec, buses = legacyBusMarks(spec)) {
     if (!mark.id.startsWith('building-mark-') || buses.has(mark.id)) continue
     const name = mark.id.replace('building-mark-', 'building-name-')
     if (mark.hidden && !visible.has(name)) continue
-    if (++count > spec.buildingLimit) {
+    if (++count > limit) {
       omit.add(mark.id)
       omit.add(name)
     }

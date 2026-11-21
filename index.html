@@ -67,7 +67,10 @@
                 placeholder="예: 세종대로 124 (한국프레스센터 19층)"
                 required
               /><label for="placename">청첩장에 쓸 장소명</label
-              ><input id="placename" maxlength="54" placeholder="장소명 또는 건물명" /><button
+              ><input id="placename" maxlength="54" placeholder="장소명 또는 건물명" />
+              <label for="search-format">약도 형식</label>
+              <select id="search-format"><option value="classic">기존 약도</option><option value="grid">직각형 미니멀</option></select>
+              <button
                 class="primary" id="search-submit" type="submit"
               >
                 주소로 약도 만들기
@@ -157,6 +160,9 @@
             <label class="check"><input type="checkbox" id="maponly" /> 지도만</label>
           </div>
           <div id="map-controls" class="map-controls" aria-label="인쇄 약도 설정" role="group">
+            <label>약도 형식
+              <select id="map-format"><option value="classic">기존 약도</option><option value="grid">직각형 미니멀</option></select>
+            </label>
             <label title="범위를 바꾸면 새 배치를 별도 프로젝트로 저장합니다.">표시 범위
               <select id="map-radius">
                 <option value="auto">자동 · 가까운 역 포함</option>
