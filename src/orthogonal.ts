@@ -46,7 +46,7 @@ function majorRank(highway:string) {
 
 // Draw only the measured extent of each corridor. Separate pieces keep separate
 // spans; unrelated or grade-separated crossings retain a gap in the lower street.
-export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoad[], addressStreet:string) {
+export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoad[], addressStreet:string, savedAngle?:number) {
   const sources:Source[] = roads.map(r=>({...r,points:r.points.map(project),local:false}))
   const majorIds = new Set(roads.map(road => road.id))
   for (const r of local) {
@@ -61,6 +61,7 @@ export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoa
     angle = Math.round(bearing/(Math.PI/2))*(Math.PI/2)-bearing
     best = cost
   }
+  if (savedAngle !== undefined) angle = savedAngle
   const groups = new Map<string,{source:Source; edges:Edge[]}>()
   for (const source of sources) {
     const points = source.points.map(p => gridPoint(p, angle))

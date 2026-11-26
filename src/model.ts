@@ -18,10 +18,11 @@ export type Item = { id: string; tone: Tone; footer: boolean; hidden: boolean } 
   | { kind: 'line'; points: Point[]; width: number }
   | { kind: 'dot' | 'flower'; x: number; y: number; radius: number }
 )
+export const gridRevision = 4
 export interface Spec {
   layout?: 'minimal'
   style?: 'vicinity' | 'neighborhood'
-  gridRevision?: 2 | 3
+  gridRevision?: 2 | 3 | typeof gridRevision
   gridAngle?: number
   captionVersion?: 2
   buildingLimit?: 0 | 2 | 4

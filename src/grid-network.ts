@@ -9,6 +9,57 @@ type Span = {source: Source; along: 0|1; cross: number; lo: number; hi: number; 
 
 const streetKey = (road: Source) => JSON.stringify([road.local, road.name || road.id])
 
+// A tunnel or bridge may have its own name in the source. Follow its actual
+// end nodes before projecting; proximity on the printed grid is insufficient.
+function structuralContinuations(sources: Source[], selected: Map<string, Source>) {
+  const streetsAt = new Map<number, Set<string>>()
+  const structuresAt = new Map<number, Source[]>()
+  const structures: Source[] = []
+  for (const road of sources) {
+    if (road.local || road.nodes.length < 2) continue
+    const key = streetKey(road)
+    if (road.name && selected.has(key)) {
+      for (const node of road.nodes) {
+        const streets = streetsAt.get(node) ?? new Set<string>()
+        streets.add(key)
+        streetsAt.set(node,streets)
+      }
+    }
+    const [,bridge,tunnel] = road.level.split('/')
+    if (![bridge,tunnel].some(tag => tag && tag !== 'no')) continue
+    structures.push(road)
+    for (const node of [road.nodes[0],road.nodes.at(-1)!]) {
+      const ways = structuresAt.get(node) ?? []
+      ways.push(road)
+      structuresAt.set(node,ways)
+    }
+  }
+  const owners = new Map<Source, Source>()
+  const seen = new Set<Source>()
+  for (const first of structures) {
+    if (seen.has(first)) continue
+    const chain = [first], degrees = new Map<number, number>()
+    seen.add(first)
+    for (const road of chain) {
+      for (const node of [road.nodes[0],road.nodes.at(-1)!]) {
+        degrees.set(node,(degrees.get(node) ?? 0)+1)
+        for (const next of structuresAt.get(node)!) {
+          if (seen.has(next) || next.name !== first.name || next.level !== first.level) continue
+          seen.add(next)
+          chain.push(next)
+        }
+      }
+    }
+    if ([...degrees.values()].some(degree => degree > 2)) continue
+    const ends = [...degrees.keys()].filter(node => degrees.get(node) === 1)
+    if (ends.length !== 2) continue
+    const common = [...(streetsAt.get(ends[0]) ?? [])].filter(key =>
+      key !== streetKey(first) && streetsAt.get(ends[1])?.has(key))
+    if (common.length === 1) for (const road of chain) owners.set(road,selected.get(common[0])!)
+  }
+  return owners
+}
+
 // Axis membership and physical connectivity are separate. Two carriageways can
 // use the same printing coordinate without bridging a missing section of road.
 class Groups {
@@ -26,9 +77,12 @@ class Groups {
 
 export function drawGridNetwork(sources: Source[], selected: Source[], rotate: (p: Point) => Point) {
   const selectedByKey = new Map(selected.map(road => [streetKey(road),road]))
+  const continuations = structuralContinuations(sources,selectedByKey)
   const vertices = new Map<string|number, Vertex>()
   const edges: Edge[] = []
-  for (const road of sources) {
+  for (const source of sources) {
+    const corridor = continuations.get(source)
+    const road = corridor ? {...source,name:corridor.name} : source
     if (!selectedByKey.has(streetKey(road))) continue
     const points = road.points.map(rotate)
     const vertex = (i: number) => {

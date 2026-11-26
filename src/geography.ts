@@ -8,6 +8,7 @@ import { registeredPlaces, mapScale } from './location-check'
 import { parseRoadAddress, matchesRegion } from './road-address'
 import {
   baseItem,
+  gridRevision,
   coordinate,
   label,
   type Geography,
@@ -858,7 +859,7 @@ function placeVenueName(name: string, items: Item[], segments: Segment[], occupi
 
 const majorRoads = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary'])
 
-export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], orthogonal = false): Spec {
+export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], orthogonal = false, savedGrid?: Spec): Spec {
   const { place } = geo,
     scale = 440 / place.radius
   const axes = mapScale(place)
@@ -893,10 +894,10 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], o
   const spec: Spec = {layout:'minimal', style:'neighborhood', captionVersion:2, ink:'#282626', items}
   const rawTransit = transitItems(place, true, true)
   const access = selectLocalRoads({...spec, items:rawTransit}, place, nearby, addressStreet)
-  const grid = orthogonal ? gridRoads(roads, project, access, addressStreet) : undefined
+  const grid = orthogonal ? gridRoads(roads, project, access, addressStreet, savedGrid?.gridAngle) : undefined
   if (grid) {
     spec.gridAngle = grid.angle
-    spec.gridRevision = 3
+    spec.gridRevision = gridRevision
   }
   const transit = grid ? transitItems(place, true, true, grid.angle) : rawTransit
   const destination: Item = { ...baseItem('destination'), kind: 'flower', x: 700, y: 605, radius: 28 }
@@ -951,7 +952,8 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], o
     ({a,b,length:distance(a,b),bounds:envelope([a,b])})) : labelStreets
   const pairedVenue = destinationCaption(name, destination, transit, mainStreets, orthogonal)
   const exits = exitLabels([destination, ...pairedVenue, ...transit], place, labelStreets, true, orthogonal)
-  const captions = obstacles([...pairedVenue, ...exits]).occupied
+  const savedCaptions = savedGrid?.items.filter(i => /^(venue$|venue-role$|transit-(exit|number)-)/.test(i.id))
+  const captions = obstacles(savedCaptions ?? [...pairedVenue, ...exits]).occupied
   if (grid) {
     spec.roadCenters = grid.centers.flatMap(({points:[a,b]}) =>
       clearSegments(a,b,captions).map(([start,end]): [Point, Point] => [start,end]))

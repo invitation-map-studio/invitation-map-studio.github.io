@@ -1,4 +1,4 @@
-import { coordinate, iso, pending, type Item, type Project } from './model'
+import { coordinate, gridRevision, iso, pending, type Item, type Project } from './model'
 const bad = () => {
   throw Error('지원하지 않는 프로젝트 형식이거나 값의 허용 범위를 벗어났습니다.')
 }
@@ -48,7 +48,7 @@ export function importProject(raw: string): Project {
   )
     bad()
   const spec = record(p.spec, ['items', 'ink', 'layout', 'style', 'captionVersion', 'buildingLimit', 'showLanes', 'singleRoads', 'roadCenters', 'gridAngle', 'gridRevision'])
-  if (spec.gridRevision !== undefined && (!choice(spec.gridRevision, 2, 3) || spec.gridAngle === undefined)) bad()
+  if (spec.gridRevision !== undefined && (!choice(spec.gridRevision, 2, 3, gridRevision) || spec.gridAngle === undefined)) bad()
   if (spec.gridAngle !== undefined && (spec.layout !== 'minimal' || !num(spec.gridAngle,-Math.PI/4-.00001,Math.PI/4+.00001))) bad()
   if (spec.singleRoads !== undefined && (spec.gridAngle === undefined || typeof spec.singleRoads !== 'boolean')) bad()
   if (spec.showLanes !== undefined && typeof spec.showLanes !== 'boolean') bad()

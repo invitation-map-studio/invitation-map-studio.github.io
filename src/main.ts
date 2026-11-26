@@ -6,6 +6,7 @@ import { catalog, datasetAt } from './catalog'
 import { unlock, canSetup } from './lock'
 import {
   DAY,
+  gridRevision,
   iso,
   normalize,
   pending,
@@ -427,14 +428,15 @@ async function use(p: Project, message: string, previous?: Project | null, arran
     try {
       const readSignal = busy ? AbortSignal.any([busy.signal, signal]) : signal
       const grid = p.spec.gridAngle !== undefined
+      const upgradeRoads = !arrange && grid && p.spec.gridRevision !== gridRevision
       // Rotation can bring a connecting way just outside the geographic query into view.
       const [roads, fringe] = await Promise.all([
         localRoadsNear(p.geo.place, readSignal),
-        arrange && grid ? indexedRoads(p.geo.place, readSignal, p.geo.place.radius * 2).catch(() => undefined) : undefined,
+        (arrange || upgradeRoads) && grid ? indexedRoads(p.geo.place, readSignal, p.geo.place.radius * 2).catch(() => undefined) : undefined,
       ])
       const street = parseRoadAddress(p.address).street
       nextLayer = {id: p.id, roads, street}
-      if (arrange) {
+      if (arrange || upgradeRoads) {
         const footer = p.spec.items.filter(item => item.footer)
         let geography = p.geo
         if (fringe) {
@@ -443,13 +445,25 @@ async function use(p: Project, message: string, previous?: Project | null, arran
           const extra = fringe.geo.roads.filter(r => names.has(r.name) && !known.has(r.id))
           geography = {...geography, roads:[...geography.roads,...extra]}
         }
-        const drawing = layout(geography, p.name, roads, grid)
-        drawing.items = [...drawing.items.filter(item => !item.footer), ...footer]
-        drawing.ink = p.spec.ink
-        if (p.spec.singleRoads) drawing.singleRoads = true
-        drawing.showLanes = p.spec.showLanes
-        drawing.buildingLimit = p.spec.buildingLimit
-        p.spec = drawing
+        const drawing = layout(geography, p.name, roads, grid, upgradeRoads ? p.spec : undefined)
+        if (upgradeRoads) {
+          // Road strokes are generated. Preserve every user-positioned label and marker.
+          const isStreet = (i: Item) => i.kind === 'line' && /^(road-|local-)/.test(i.id)
+          const lines = drawing.items.filter(isStreet)
+          if (lines.length) {
+            p.spec.items = [...lines,...p.spec.items.filter(i => !isStreet(i))]
+            p.spec.roadCenters = drawing.roadCenters
+            p.spec.gridRevision = drawing.gridRevision
+            p.review = pending()
+          }
+        } else {
+          drawing.items = [...drawing.items.filter(item => !item.footer), ...footer]
+          drawing.ink = p.spec.ink
+          if (p.spec.singleRoads) drawing.singleRoads = true
+          drawing.showLanes = p.spec.showLanes
+          drawing.buildingLimit = p.spec.buildingLimit
+          p.spec = drawing
+        }
       } else addLocalRoads(p, selectLocalRoads(p.spec, p.geo.place, roads, street), street)
     } catch {
       messageRoad = '골목·보행로 자료를 읽지 못했습니다. 약도를 다시 열면 재시도합니다.'
@@ -524,7 +538,7 @@ async function make(place: Place, name: string, force: boolean, signal: AbortSig
   const grid = searching ? sel('search-format').value === 'grid' : current.spec.gridAngle !== undefined
   let old =
     (current.spec.gridAngle !== undefined) === grid && current.geo &&
-    (!searching || (current.spec.captionVersion === 2 && (!grid || current.spec.gridRevision === 3))) &&
+    (!searching || (current.spec.captionVersion === 2 && (!grid || current.spec.gridRevision === gridRevision))) &&
     placeKey(current.geo.place) === placeKey(place) &&
     current.name === name &&
     (!searching || (footer?.kind === 'text' && footer.text === details))

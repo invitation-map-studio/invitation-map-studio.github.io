@@ -85,3 +85,27 @@ test('한 줄 도로는 모서리에서 만나고 기존 저장본에서도 같�
     assert.deepEqual(displayItems({...spec,singleRoads:false,roadCenters}),spec.items)
   }
 })
+
+test('이름이 다른 지하차도 양 끝이 같은 도로에 연결되면 한 줄과 두 줄 모두 직선으로 정렬한다', () => {
+  const street = (id:number, points:Point[], nodes:number[]) => ({...road(id,points),nodes})
+  const north = street(1,[[430,240],[411,500]],[1,2])
+  const south = street(2,[[426,548],[468,950]],[4,5])
+  const tunnel = [
+    {...street(3,[[411,500],[420,522]],[2,3]),name:'역지하차도',level:'-1//yes'},
+    {...street(4,[[420,522],[426,548]],[3,4]),name:'역지하차도',level:'-1//yes'},
+  ]
+  const grid = (ways: Road[]) => gridRoads([north,south,...ways],p=>p,[],north.name)
+  const connected = grid(tunnel)
+  assert.equal(connected.centers.length,1)
+  assert.equal(connected.paths.length,2)
+  const [a,b] = connected.centers[0].points
+  assert.equal(a[0],b[0])
+  assert.ok(b[1]-a[1]>550)
+  for (const rail of connected.paths) {
+    assert.equal(rail.points[0][0],rail.points[1][0])
+    assert.equal(Math.abs(rail.points[0][0]-a[0]),7)
+  }
+  const broken = grid([tunnel[0],{...tunnel[1],nodes:[3,99]}])
+  assert.equal(broken.centers.length,2)
+  assert.notEqual(broken.centers[0].points[0][0],broken.centers[1].points[0][0])
+})
