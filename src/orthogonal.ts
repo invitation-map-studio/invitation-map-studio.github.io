@@ -116,6 +116,6 @@ export function gridRoads(roads:Road[], project:(p:Point)=>Point, local:LocalRoa
     if (crowded) continue
     chosen.push(axis)
   }
-  const paths = drawGridNetwork(sources, chosen.map(axis => axis.source), p => gridPoint(p,angle))
-  return {angle,paths}
+  const network = drawGridNetwork(sources, chosen.map(axis => axis.source), p => gridPoint(p,angle))
+  return {angle,...network}
 }

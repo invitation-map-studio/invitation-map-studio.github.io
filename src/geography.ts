@@ -952,6 +952,10 @@ export function layout(geo: Geography, name: string, nearby: LocalRoad[] = [], o
   const pairedVenue = destinationCaption(name, destination, transit, mainStreets, orthogonal)
   const exits = exitLabels([destination, ...pairedVenue, ...transit], place, labelStreets, true, orthogonal)
   const captions = obstacles([...pairedVenue, ...exits]).occupied
+  if (grid) {
+    spec.roadCenters = grid.centers.flatMap(({points:[a,b]}) =>
+      clearSegments(a,b,captions).map(([start,end]): [Point, Point] => [start,end]))
+  }
   const sections = new Map<number,number>()
   const localIds = new Map(access.map(r=>[r.id,r]))
   for (const { road, points, center } of simplified) {

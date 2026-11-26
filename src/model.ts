@@ -25,6 +25,8 @@ export interface Spec {
   gridAngle?: number
   captionVersion?: 2
   buildingLimit?: 0 | 2 | 4
+  roadCenters?: [Point, Point][]
+  singleRoads?: boolean
   showLanes?: boolean
   items: Item[]
   ink: string

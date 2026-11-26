@@ -24,7 +24,7 @@ class Groups {
   join(a: number,b: number) { this.parents[this.root(a)] = this.root(b) }
 }
 
-export function drawGridNetwork(sources: Source[], selected: Source[], rotate: (p: Point) => Point): StreetPath[] {
+export function drawGridNetwork(sources: Source[], selected: Source[], rotate: (p: Point) => Point) {
   const selectedByKey = new Map(selected.map(road => [streetKey(road),road]))
   const vertices = new Map<string|number, Vertex>()
   const edges: Edge[] = []
@@ -127,22 +127,24 @@ export function drawGridNetwork(sources: Source[], selected: Source[], rotate: (
       for (const joint of s.joints) prev.joints.add(joint)
     }
   }
-  return outline(merged)
+  return {paths:outline(merged, false), centers:outline(merged, true)}
 }
 
-function outline(spans: Span[]): StreetPath[] {
+function outline(spans: Span[], centerline: boolean): StreetPath[] {
   const paths: StreetPath[] = []
   for (const span of spans) {
     const {along,source,cross} = span
+    if (centerline && source.local) continue
     const nearby = spans.filter(s => s.along !== along && (source.local || !s.source.local) &&
       s.lo <= cross+.01 && s.hi >= cross-.01 && s.cross >= span.lo-.01 && s.cross <= span.hi+.01)
-    for (const offset of source.local ? [0] : [-7,7]) {
+    for (const offset of centerline || source.local ? [0] : [-7,7]) {
       const at = cross+offset
       let lo = span.lo, hi = span.hi
       const gaps: number[][] = []
       for (const other of nearby) {
         const joined = [...span.joints].some(j => other.joints.has(j))
         const half = other.source.local ? 1 : 7
+        if (joined && centerline) continue
         if (joined) {
           if (Math.abs(other.cross-lo) < .01) lo -= half
           if (Math.abs(other.cross-hi) < .01) hi += half

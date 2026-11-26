@@ -1,3 +1,4 @@
+import { savedRoadCenters } from './single-roads'
 import { destinationPath } from './symbols'
 import { laneLayerVisible, type Item, type Project, type Spec } from './model'
 const NS = 'http://www.w3.org/2000/svg'
@@ -81,7 +82,18 @@ function legacyBusMarks(spec: Spec) {
 // The generator emits landmarks in priority order. A building's name and
 // symbol count as one place, even when one of them was hidden manually.
 export function displayItems(spec: Spec, buses = legacyBusMarks(spec)) {
-  const items = spec.items.filter(item => laneLayerVisible(spec, item))
+  let items = spec.items.filter(item => laneLayerVisible(spec, item))
+  if (spec.gridAngle !== undefined && spec.singleRoads) {
+    const isRoad = (i: Item) => i.kind === 'line' && /^road-\d+-/.test(i.id)
+    const first = items.findIndex(isRoad)
+    if (first >= 0) {
+      const centers = (spec.roadCenters ?? savedRoadCenters(items)).map((points,i): Item => ({
+        kind:'line', id:'road-single-'+i, width:2.8, points, tone:'soft', footer:false, hidden:false,
+      }))
+      items = items.filter(i => !isRoad(i))
+      items.splice(first,0,...centers)
+    }
+  }
   const limit = spec.buildingLimit ?? (spec.gridAngle === undefined ? Infinity : 3)
   if (limit === Infinity) return items
   const visible = new Set(spec.items.filter(i => !i.hidden).map(i => i.id))

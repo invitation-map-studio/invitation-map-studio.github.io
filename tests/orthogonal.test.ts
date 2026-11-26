@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { gridPoint, gridRoads } from '../src/orthogonal'
-import type { Road, Point } from '../src/model'
+import { displayItems } from '../src/render'
+import type { Road, Point, Item, Spec } from '../src/model'
 
 function road(id: number, points: Point[]): Road {
   return {id, name:'예식장길', version:1, highway:'secondary', level:'0', nodes:[], points}
@@ -64,4 +65,23 @@ test('같은 도로가 직각으로 꺾이는 곳은 두 외곽선이 각각 모
   assert.equal(vertical.length,2)
   for (const h of horizontal)
     assert.ok(vertical.some(v => v.points[0].every((n,i) => Math.abs(n-h.points[1][i])<.01)))
+})
+
+test('한 줄 도로는 모서리에서 만나고 기존 저장본에서도 같은 위치에 표시된다', () => {
+  const bend = {...road(1,[[330,605],[700,605],[700,930]]), nodes:[1,2,3]}
+  const {angle,paths,centers} = gridRoads([bend],p => p,[],bend.name)
+  const rails: Item[] = paths.map(({points},i) => ({
+    id:'road-1-'+i, kind:'line', points, width:4, tone:'soft', footer:false, hidden:false,
+  }))
+  const marker: Item = {id:'destination',kind:'flower',x:600,y:600,radius:15,tone:'ink',footer:false,hidden:false}
+  const spec: Spec = {items:[...rails,marker],gridAngle:angle,ink:'#111111'}
+  const native = centers.map(({points:[a,b]}): [Point,Point] => [a,b])
+  assert.equal(native.length,2)
+  assert.deepEqual(native[0][1],native[1][0])
+  for (const roadCenters of [undefined,native]) {
+    const single = displayItems({...spec,singleRoads:true,roadCenters})
+    assert.deepEqual(single.flatMap(i => i.kind==='line' && i.width===2.8 ? [i.points] : []),native)
+    assert.equal(single.at(-1),marker)
+    assert.deepEqual(displayItems({...spec,singleRoads:false,roadCenters}),spec.items)
+  }
 })

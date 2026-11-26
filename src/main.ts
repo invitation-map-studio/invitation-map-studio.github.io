@@ -446,6 +446,7 @@ async function use(p: Project, message: string, previous?: Project | null, arran
         const drawing = layout(geography, p.name, roads, grid)
         drawing.items = [...drawing.items.filter(item => !item.footer), ...footer]
         drawing.ink = p.spec.ink
+        if (p.spec.singleRoads) drawing.singleRoads = true
         drawing.showLanes = p.spec.showLanes
         drawing.buildingLimit = p.spec.buildingLimit
         p.spec = drawing
@@ -509,6 +510,7 @@ function revised(old: Project, geo: Geography, name: string): Project {
     original = layout(old.geo!, old.name, [], grid)
   const previous = new Map(original.items.map((i) => [i.id, i])),
     edits = new Map(old.spec.items.map((i) => [i.id, i]))
+  if (old.spec.singleRoads) p.spec.singleRoads = true
   p.spec.showLanes = old.spec.showLanes
   p.spec.buildingLimit = old.spec.buildingLimit
   p.spec.ink = old.spec.ink
@@ -786,6 +788,8 @@ function syncMapControls() {
   el('map-controls').hidden = !place || current.spec.layout !== 'minimal'
   if (!place) return
   sel('map-format').value = current.spec.gridAngle === undefined ? 'classic' : 'grid'
+  el('road-style-control').hidden = current.spec.gridAngle === undefined
+  sel('road-style').value = current.spec.singleRoads ? 'single' : 'double'
   const ranges = sel('map-radius')
   const auto = printRadius(place)
   ranges.options[0].textContent = '자동 · ' + auto + ' m'
@@ -800,6 +804,16 @@ function syncMapControls() {
   field('show-lanes').checked = current.spec.showLanes === true
   sel('building-limit').value = String(current.spec.buildingLimit ?? 'auto')
 }
+sel('road-style').onchange = action(async () => {
+  try {
+    if (current.spec.gridAngle === undefined) return
+    const p = structuredClone(current)
+    p.spec.singleRoads = sel('road-style').value === 'single'
+    p.review = pending()
+    await modify(p)
+    status(p.spec.singleRoads ? '도로를 한 줄로 표시했습니다.' : '도로를 두 줄로 표시했습니다.')
+  } finally { syncMapControls() }
+})
 field('show-lanes').onchange = action(async () => {
   const p = structuredClone(current)
   p.spec.showLanes = field('show-lanes').checked
@@ -852,6 +866,7 @@ sel('map-radius').onchange = action(async signal => {
     signal.throwIfAborted()
     const geo: Geography = cached?.geo ?? seed?.geo ?? { source:'osm', place:frame, roads:[], landmarks:[] }
     const p = createProject(geo, current.name, '', current.spec.gridAngle !== undefined)
+    if (current.spec.singleRoads) p.spec.singleRoads = true
     p.lastSuccessfulFetchAt = cached?.lastSuccessfulFetchAt ?? seed?.fetchedAt ?? datasetAt
     p.expiresAt = iso(Date.parse(p.lastSuccessfulFetchAt) + DAY)
     p.spec.ink = current.spec.ink

@@ -47,9 +47,10 @@ export function importProject(raw: string): Project {
     !choice(p.origin, 'osm', 'reference')
   )
     bad()
-  const spec = record(p.spec, ['items', 'ink', 'layout', 'style', 'captionVersion', 'buildingLimit', 'showLanes', 'gridAngle', 'gridRevision'])
+  const spec = record(p.spec, ['items', 'ink', 'layout', 'style', 'captionVersion', 'buildingLimit', 'showLanes', 'singleRoads', 'roadCenters', 'gridAngle', 'gridRevision'])
   if (spec.gridRevision !== undefined && (!choice(spec.gridRevision, 2, 3) || spec.gridAngle === undefined)) bad()
   if (spec.gridAngle !== undefined && (spec.layout !== 'minimal' || !num(spec.gridAngle,-Math.PI/4-.00001,Math.PI/4+.00001))) bad()
+  if (spec.singleRoads !== undefined && (spec.gridAngle === undefined || typeof spec.singleRoads !== 'boolean')) bad()
   if (spec.showLanes !== undefined && typeof spec.showLanes !== 'boolean') bad()
   if (spec.buildingLimit !== undefined && !choice(spec.buildingLimit, 0, 2, 4)) bad()
   if (spec.captionVersion !== undefined && spec.captionVersion !== 2) bad()
@@ -59,6 +60,12 @@ export function importProject(raw: string): Project {
     bad()
   const ids = new Set<string>()
   let vertices = 0
+  if (spec.roadCenters !== undefined) {
+    if (spec.gridAngle === undefined || !Array.isArray(spec.roadCenters) || spec.roadCenters.length > 20000 ||
+        spec.roadCenters.some((segment: unknown) => !Array.isArray(segment) || segment.length !== 2 ||
+          !point(segment[0]) || !point(segment[1]))) bad()
+    vertices += spec.roadCenters.length * 2
+  }
   for (const obj of spec.items) {
     const common = ['id', 'tone', 'kind', 'hidden', 'footer']
     const extra =
